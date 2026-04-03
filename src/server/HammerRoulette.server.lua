@@ -19,6 +19,11 @@ local roundInProgress = false
 local currentBearer = nil
 local hammerTool = nil
 
+-- Forward declarations to fix scope issues
+local startMatchmaking
+local startRoulettePhase
+local startMaceMechanic
+
 local function getWholeMap()
     return Workspace:FindFirstChild("WholeMap")
 end
@@ -56,10 +61,17 @@ local function teleportPlayers()
             -- Find a spawn point, or use a default if missing
             local spawnPos = Vector3.new(0, 10, 0)
             if #spawns > 0 then
-                local spawnPart = spawns[(i % #spawns) + 1]
+                -- Use math.floor to properly map 'i' directly to index (1 to #spawns)
+                -- We use ((i - 1) % #spawns) + 1 so player 1 gets spawn 1, player 2 gets spawn 2, etc.
+                local spawnIndex = ((i - 1) % #spawns) + 1
+                local spawnPart = spawns[spawnIndex]
+
                 if spawnPart and spawnPart:IsA("BasePart") then
-                    spawnPos = spawnPart.Position + Vector3.new(0, 3, 0)
+                    spawnPos = spawnPart.Position + Vector3.new(0, 5, 0)
                 end
+            else
+                -- Fallback spread if no spawns exist
+                spawnPos = Vector3.new((i - 1) * 5, 10, 0)
             end
 
             character.HumanoidRootPart.CFrame = CFrame.new(spawnPos)
@@ -104,13 +116,7 @@ local function cleanupRound()
     end
 
     local hammerModel = getHammerSpawnModel()
-    if hammerModel then
-        for _, part in ipairs(hammerModel:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Transparency = 1
-            end
-        end
-    end
+    -- We removed the transparency hiding so the hammer remains visible on the ground.
 end
 
 local function endRound(winner)
@@ -141,11 +147,6 @@ local function giveHammer(player)
 end
 
 -- Pre-declare the roulette phase
--- Forward declarations
-local startMatchmaking
-local startRoulettePhase
-local startMaceMechanic
-
 startRoulettePhase = function()
     print("Roulette Phase Starting...")
     if not roundInProgress then return end
@@ -156,15 +157,7 @@ startRoulettePhase = function()
         return
     end
 
-    -- Make HammerModel visible
     local hammerModel = getHammerSpawnModel()
-    if hammerModel then
-        for _, part in ipairs(hammerModel:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Transparency = 0
-            end
-        end
-    end
 
     -- Weighted random selection
     local totalWeight = 0
@@ -206,23 +199,20 @@ startRoulettePhase = function()
     -- Spin the Hammer Model for 3 seconds using PivotTo
     if hammerModel then
         local startTime = tick()
+        local initialPivot = hammerModel:GetPivot()
         local connection
         connection = RunService.Heartbeat:Connect(function(dt)
-            if tick() - startTime >= SPIN_DURATION then
+            local elapsed = tick() - startTime
+            if elapsed >= SPIN_DURATION then
                 connection:Disconnect()
                 return
             end
-            local currentPivot = hammerModel:GetPivot()
-            hammerModel:PivotTo(currentPivot * CFrame.Angles(0, math.rad(360 * dt), 0))
+            -- Spin around the Y axis over time based on total elapsed time, not dt
+            -- For example, spinning at 360 degrees per second:
+            hammerModel:PivotTo(initialPivot * CFrame.Angles(0, math.rad(360 * elapsed), 0))
         end)
         task.wait(SPIN_DURATION)
 
-        -- Hide HammerModel again
-        for _, part in ipairs(hammerModel:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Transparency = 1
-            end
-        end
     else
         -- If no HammerModel, just wait
         task.wait(SPIN_DURATION)
@@ -260,6 +250,9 @@ startMaceMechanic = function(player)
     local isFalling = false
     local mechanicConnections = {}
 
+    -- To prevent double jumping (especially on mobile)
+    local hasJumped = false
+
     local function cleanupMechanic()
         for _, conn in ipairs(mechanicConnections) do
             conn:Disconnect()
@@ -277,7 +270,12 @@ startMaceMechanic = function(player)
 
     -- Listen for Humanoid state changes to track falling and landing
     table.insert(mechanicConnections, humanoid.StateChanged:Connect(function(oldState, newState)
-        if newState == Enum.HumanoidStateType.Freefall then
+        if newState == Enum.HumanoidStateType.Jumping then
+            -- The moment they jump, disable jump power so they can't jump again mid-air
+            hasJumped = true
+            humanoid.UseJumpPower = false
+            humanoid.JumpPower = 0
+        elseif newState == Enum.HumanoidStateType.Freefall then
             isFalling = true
         elseif newState == Enum.HumanoidStateType.Landed then
             if isFalling then
@@ -320,7 +318,12 @@ startMaceMechanic = function(player)
     local handle = hammerTool:FindFirstChild("Handle")
     if handle then
         table.insert(mechanicConnections, handle.Touched:Connect(function(hit)
-            if not isFalling then return end -- Only hits during a fall count
+            -- Only hits count if the player is mid-air (either falling or jumping up)
+            -- Relying strictly on 'isFalling' can sometimes miss if state doesn't update fast enough
+            local humanoidState = humanoid:GetState()
+            local inAir = humanoidState == Enum.HumanoidStateType.Freefall or humanoidState == Enum.HumanoidStateType.Jumping or isFalling
+
+            if not inAir then return end
 
             -- Make sure the hit object belongs to a character
             local hitCharacter = hit.Parent
@@ -352,6 +355,11 @@ startMaceMechanic = function(player)
                 rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, BOUNCE_POWER, rootPart.AssemblyLinearVelocity.Z)
 
                 -- Note: They remain the bearer and can hit someone else while in the air again!
+
+                -- Reset jump state if they want to jump after landing on someone (though the bounce keeps them in air anyway)
+                hasJumped = false
+                humanoid.UseJumpPower = true
+                humanoid.JumpPower = 140
             end
         end))
     end
@@ -466,10 +474,8 @@ local function initializeMapObjects()
 
             local hammerModel = hammerSpawnFolder:FindFirstChild("HammerModel")
             if hammerModel then
-                -- Hide initially
                 for _, part in ipairs(hammerModel:GetDescendants()) do
                     if part:IsA("BasePart") then
-                        part.Transparency = 1
                         part.Anchored = true
                         part.CanCollide = false
                     end
