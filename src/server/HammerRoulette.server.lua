@@ -448,6 +448,15 @@ local function initializeMapObjects()
 
         local hammerSpawnFolder = wholeMap:FindFirstChild("HammerSpawn")
         if hammerSpawnFolder then
+            -- Loop over all children just to be safe, making all baseparts inside the folder invisible (except the model which is handled below)
+            for _, child in ipairs(hammerSpawnFolder:GetChildren()) do
+                if child:IsA("BasePart") then
+                    child.Transparency = 1
+                    child.Anchored = true
+                    child.CanCollide = false
+                end
+            end
+
             local hammerSpawnPart = hammerSpawnFolder:FindFirstChild("HammerSpawn")
             if hammerSpawnPart and hammerSpawnPart:IsA("BasePart") then
                 hammerSpawnPart.Transparency = 1
