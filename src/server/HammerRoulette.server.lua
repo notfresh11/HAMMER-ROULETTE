@@ -110,8 +110,10 @@ local function cleanupRound()
     local hammerModel = getHammerSpawnModel()
     if hammerModel and not idleSpinConnection then
         idleSpinConnection = RunService.Heartbeat:Connect(function(dt)
-            local currentPivot = hammerModel:GetPivot()
-            hammerModel:PivotTo(currentPivot * CFrame.Angles(0, math.rad(90 * dt), 0))
+            if hammerModel and hammerModel.Parent then
+                local currentPivot = hammerModel:GetPivot()
+                hammerModel:PivotTo(currentPivot * CFrame.Angles(0, math.rad(90 * dt), 0))
+            end
         end)
     end
 
@@ -134,6 +136,21 @@ local function endRound(winner)
         print("Winner is: " .. winner.Name)
     else
         print("Round ended in a draw or was cancelled.")
+    end
+
+    -- Teleport all players back to the default Roblox spawn location and spread them out
+    local defaultSpawn = Workspace:FindFirstChildWhichIsA("SpawnLocation")
+    local defaultPos = Vector3.new(0, 10, 0)
+    if defaultSpawn then
+        defaultPos = defaultSpawn.Position + Vector3.new(0, 5, 0)
+    end
+
+    for index, player in ipairs(activePlayers) do
+        if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            -- Spread them out in a line or circle to prevent physics flinging
+            local offset = Vector3.new((index - 1) * 5, 0, 0)
+            player.Character.HumanoidRootPart.CFrame = CFrame.new(defaultPos + offset)
+        end
     end
 
     cleanupRound()
@@ -160,6 +177,10 @@ end
 startRoulettePhase = function()
     print("Roulette Phase Starting...")
     if not roundInProgress then return end
+
+    -- Teleport players to their designated spawn plates at the start of EVERY phase
+    teleportPlayers()
+    task.wait(1)
 
     local hasWinner, winner = checkWinCondition()
     if hasWinner then
@@ -219,18 +240,23 @@ startRoulettePhase = function()
         local hammerPosition = initialPivot.Position
 
         -- Create a CFrame looking at the player, keeping the same Y level
-        -- Note: Depending on the hammer's forward face in the mesh, you might need to adjust the orientation.
-        -- Assuming the front face (lookVector) is the "head" of the hammer.
         local targetPivot = CFrame.new(hammerPosition, Vector3.new(targetPosition.X, hammerPosition.Y, targetPosition.Z))
 
         local startTime = tick()
         local connection
 
-        -- Total full spins before stopping
-        local totalSpins = 5
-        local totalRotationAngle = math.rad(360 * totalSpins)
+        -- To avoid CFrame:Lerp quaternion flipping issues over 180 degrees, we calculate the exact total angular distance.
+        -- Get the Y-axis rotation (yaw) of both CFrames
+        local _, startYaw, _ = initialPivot:ToEulerAnglesYXZ()
+        local _, targetYaw, _ = targetPivot:ToEulerAnglesYXZ()
 
-        -- To make it point smoothly, we interpolate the rotation
+        -- Calculate the shortest angle difference
+        local yawDiff = (targetYaw - startYaw + math.pi) % (2 * math.pi) - math.pi
+
+        -- Add multiple full rotations (e.g. 5 spins) to the yaw difference
+        local totalSpins = 5
+        local totalYawToTravel = yawDiff + (math.pi * 2 * totalSpins)
+
         connection = RunService.Heartbeat:Connect(function(dt)
             local elapsed = tick() - startTime
             local alpha = math.min(elapsed / SPIN_DURATION, 1)
@@ -245,14 +271,13 @@ startRoulettePhase = function()
                 return
             end
 
-            -- Spin effect: calculate current extra spin amount
-            local currentSpinAngle = totalRotationAngle * (1 - easeOutAlpha)
+            -- Calculate the exact angle for this frame
+            local currentYaw = totalYawToTravel * easeOutAlpha
 
-            -- We want the final CFrame to be targetPivot. So we apply the extra spin on top of it.
-            -- This way, as easeOutAlpha approaches 1, currentSpinAngle approaches 0, and we land exactly on targetPivot.
-            local currentPivot = targetPivot * CFrame.Angles(0, currentSpinAngle, 0)
+            -- Apply the single Y-axis rotation to the initial pivot
+            local finalPivot = initialPivot * CFrame.Angles(0, currentYaw, 0)
 
-            hammerModel:PivotTo(currentPivot)
+            hammerModel:PivotTo(finalPivot)
         end)
 
         task.wait(SPIN_DURATION)
@@ -316,7 +341,7 @@ startMaceMechanic = function(player)
         if newState == Enum.HumanoidStateType.Jumping then
             -- The moment they jump, disable jump power so they can't jump again mid-air
             hasJumped = true
-            humanoid.UseJumpPower = false
+            humanoid.UseJumpPower = true
             humanoid.JumpPower = 0
         elseif newState == Enum.HumanoidStateType.Freefall then
             isFalling = true
@@ -362,54 +387,68 @@ startMaceMechanic = function(player)
         end
     end))
 
-    -- Listen for Tool hits
-    local handle = hammerTool:FindFirstChild("Handle")
-    if handle then
-        table.insert(mechanicConnections, handle.Touched:Connect(function(hit)
-            -- Only hits count if the player is mid-air (either falling or jumping up)
-            -- Relying strictly on 'isFalling' can sometimes miss if state doesn't update fast enough
-            local humanoidState = humanoid:GetState()
-            local inAir = humanoidState == Enum.HumanoidStateType.Freefall or humanoidState == Enum.HumanoidStateType.Jumping or isFalling
+    -- Listen for Tool hits on ALL parts of the tool
+    for _, toolPart in ipairs(hammerTool:GetDescendants()) do
+        if toolPart:IsA("BasePart") then
+            table.insert(mechanicConnections, toolPart.Touched:Connect(function(hit)
+                -- Only hits count if the player is off the ground or just jumped/fell
+                local humanoidState = humanoid:GetState()
+                local inAir = humanoidState == Enum.HumanoidStateType.Freefall or humanoidState == Enum.HumanoidStateType.Jumping or isFalling
 
-            if not inAir then return end
+                -- Also check if they are literally above ground as a fallback for latency
+                if not inAir then
+                    local rayOrigin = rootPart.Position
+                    local rayDirection = Vector3.new(0, -5, 0)
+                    local params = RaycastParams.new()
+                    params.FilterType = Enum.RaycastFilterType.Exclude
+                    params.FilterDescendantsInstances = {character}
 
-            -- Make sure the hit object belongs to a character
-            local hitCharacter = hit.Parent
-            if not hitCharacter then return end
-
-            -- Ensure we don't hit ourselves
-            if hitCharacter == character then return end
-
-            local hitHumanoid = hitCharacter:FindFirstChild("Humanoid")
-            local hitPlayer = Players:GetPlayerFromCharacter(hitCharacter)
-
-            -- Make sure the hit opponent is part of the game and alive
-            local isOpponentAlive = false
-            if hitPlayer then
-                local index = table.find(alivePlayersInRound, hitPlayer)
-                if index then
-                    isOpponentAlive = true
-                    table.remove(alivePlayersInRound, index)
+                    local raycastResult = Workspace:Raycast(rayOrigin, rayDirection, params)
+                    if not raycastResult then
+                        inAir = true
+                    end
                 end
-            end
 
-            if hitHumanoid and hitHumanoid.Health > 0 and isOpponentAlive then
-                -- Insta-kill the opponent
-                hitHumanoid.Health = 0
+                if not inAir then return end
 
-                print(player.Name .. " smashed " .. hitCharacter.Name .. "!")
+                -- Make sure the hit object belongs to a character
+                local hitCharacter = hit.Parent
+                if not hitCharacter then return end
 
-                -- Apply bounce to the attacker
-                rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, BOUNCE_POWER, rootPart.AssemblyLinearVelocity.Z)
+                -- Ensure we don't hit ourselves
+                if hitCharacter == character then return end
 
-                -- Note: They remain the bearer and can hit someone else while in the air again!
+                local hitHumanoid = hitCharacter:FindFirstChild("Humanoid")
+                local hitPlayer = Players:GetPlayerFromCharacter(hitCharacter)
 
-                -- Reset jump state if they want to jump after landing on someone (though the bounce keeps them in air anyway)
-                hasJumped = false
-                humanoid.UseJumpPower = true
-                humanoid.JumpPower = 140
-            end
-        end))
+                -- Make sure the hit opponent is part of the game and alive
+                local isOpponentAlive = false
+                if hitPlayer then
+                    local index = table.find(alivePlayersInRound, hitPlayer)
+                    if index then
+                        isOpponentAlive = true
+                        table.remove(alivePlayersInRound, index)
+                    end
+                end
+
+                if hitHumanoid and hitHumanoid.Health > 0 and isOpponentAlive then
+                    -- Insta-kill the opponent
+                    hitHumanoid.Health = 0
+
+                    print(player.Name .. " smashed " .. hitCharacter.Name .. "!")
+
+                    -- Apply bounce to the attacker
+                    rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, BOUNCE_POWER, rootPart.AssemblyLinearVelocity.Z)
+
+                    -- Note: They remain the bearer and can hit someone else while in the air again!
+
+                    -- Reset jump state if they want to jump after landing on someone (though the bounce keeps them in air anyway)
+                    hasJumped = false
+                    humanoid.UseJumpPower = true
+                    humanoid.JumpPower = 140
+                end
+            end))
+        end
     end
 
 end
@@ -453,9 +492,6 @@ startMatchmaking = function()
             playerWeights[currentPlayers[i].UserId] = 1
         end
     end
-
-    teleportPlayers()
-    task.wait(1)
 
     startRoulettePhase()
 end
@@ -528,6 +564,12 @@ local function initializeMapObjects()
                         part.CanCollide = false
                     end
                 end
+
+                -- Explicitly place the HammerModel directly above the HammerSpawn part
+                if hammerSpawnPart then
+                    local targetCFrame = hammerSpawnPart.CFrame * CFrame.new(0, 3, 0)
+                    hammerModel:PivotTo(targetCFrame)
+                end
             end
         end
 
@@ -544,8 +586,10 @@ local function initializeMapObjects()
         local hm = getHammerSpawnModel()
         if hm and not idleSpinConnection then
             idleSpinConnection = RunService.Heartbeat:Connect(function(dt)
-                local currentPivot = hm:GetPivot()
-                hm:PivotTo(currentPivot * CFrame.Angles(0, math.rad(90 * dt), 0))
+                if hm and hm.Parent then
+                    local currentPivot = hm:GetPivot()
+                    hm:PivotTo(currentPivot * CFrame.Angles(0, math.rad(90 * dt), 0))
+                end
             end)
         end
     end
