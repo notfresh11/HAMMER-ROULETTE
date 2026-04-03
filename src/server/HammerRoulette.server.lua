@@ -18,6 +18,7 @@ local playerWeights = {}
 local roundInProgress = false
 local currentBearer = nil
 local hammerTool = nil
+local idleSpinConnection = nil
 
 -- Forward declarations to fix scope issues
 local startMatchmaking
@@ -105,6 +106,15 @@ local function cleanupRound()
         hammerTool = nil
     end
 
+    -- Restart idle spinning if it was stopped
+    local hammerModel = getHammerSpawnModel()
+    if hammerModel and not idleSpinConnection then
+        idleSpinConnection = RunService.Heartbeat:Connect(function(dt)
+            local currentPivot = hammerModel:GetPivot()
+            hammerModel:PivotTo(currentPivot * CFrame.Angles(0, math.rad(90 * dt), 0))
+        end)
+    end
+
     -- Reset all players jump height just in case
     for _, player in ipairs(Players:GetPlayers()) do
         local char = player.Character
@@ -159,6 +169,12 @@ startRoulettePhase = function()
 
     local hammerModel = getHammerSpawnModel()
 
+    -- Stop idle spinning during the roulette spin phase
+    if idleSpinConnection then
+        idleSpinConnection:Disconnect()
+        idleSpinConnection = nil
+    end
+
     -- Weighted random selection
     local totalWeight = 0
     for _, player in ipairs(activePlayers) do
@@ -196,25 +212,52 @@ startRoulettePhase = function()
         end
     end
 
-    -- Spin the Hammer Model for 3 seconds using PivotTo
-    if hammerModel then
-        local startTime = tick()
+    -- Spin the Hammer Model like a roulette and stop pointing at the chosen player
+    if hammerModel and chosenPlayer and chosenPlayer.Character and chosenPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local targetPosition = chosenPlayer.Character.HumanoidRootPart.Position
         local initialPivot = hammerModel:GetPivot()
+        local hammerPosition = initialPivot.Position
+
+        -- Create a CFrame looking at the player, keeping the same Y level
+        -- Note: Depending on the hammer's forward face in the mesh, you might need to adjust the orientation.
+        -- Assuming the front face (lookVector) is the "head" of the hammer.
+        local targetPivot = CFrame.new(hammerPosition, Vector3.new(targetPosition.X, hammerPosition.Y, targetPosition.Z))
+
+        local startTime = tick()
         local connection
+
+        -- Total full spins before stopping
+        local totalSpins = 5
+        local totalRotationAngle = math.rad(360 * totalSpins)
+
+        -- To make it point smoothly, we interpolate the rotation
         connection = RunService.Heartbeat:Connect(function(dt)
             local elapsed = tick() - startTime
+            local alpha = math.min(elapsed / SPIN_DURATION, 1)
+
+            -- Use an ease-out cubic function for a smooth roulette slow-down effect
+            local easeOutAlpha = 1 - math.pow(1 - alpha, 3)
+
             if elapsed >= SPIN_DURATION then
                 connection:Disconnect()
+                -- Snap exactly to target at the end to be perfectly accurate
+                hammerModel:PivotTo(targetPivot)
                 return
             end
-            -- Spin around the Y axis over time based on total elapsed time, not dt
-            -- For example, spinning at 360 degrees per second:
-            hammerModel:PivotTo(initialPivot * CFrame.Angles(0, math.rad(360 * elapsed), 0))
-        end)
-        task.wait(SPIN_DURATION)
 
+            -- Spin effect: calculate current extra spin amount
+            local currentSpinAngle = totalRotationAngle * (1 - easeOutAlpha)
+
+            -- We want the final CFrame to be targetPivot. So we apply the extra spin on top of it.
+            -- This way, as easeOutAlpha approaches 1, currentSpinAngle approaches 0, and we land exactly on targetPivot.
+            local currentPivot = targetPivot * CFrame.Angles(0, currentSpinAngle, 0)
+
+            hammerModel:PivotTo(currentPivot)
+        end)
+
+        task.wait(SPIN_DURATION)
     else
-        -- If no HammerModel, just wait
+        -- Fallback if no HammerModel or missing character parts
         task.wait(SPIN_DURATION)
     end
 
@@ -284,6 +327,11 @@ startMaceMechanic = function(player)
                 cleanupMechanic()
                 task.wait(1)
                 startRoulettePhase()
+            else
+                -- If they somehow landed without triggering a fall, restore jump
+                hasJumped = false
+                humanoid.UseJumpPower = true
+                humanoid.JumpPower = 140
             end
         end
     end))
@@ -490,6 +538,15 @@ local function initializeMapObjects()
                 -- Move it to ServerStorage so players can't just pick it up from Workspace
                 tool.Parent = ServerStorage
             end
+        end
+
+        -- Start continuous idle spinning
+        local hm = getHammerSpawnModel()
+        if hm and not idleSpinConnection then
+            idleSpinConnection = RunService.Heartbeat:Connect(function(dt)
+                local currentPivot = hm:GetPivot()
+                hm:PivotTo(currentPivot * CFrame.Angles(0, math.rad(90 * dt), 0))
+            end)
         end
     end
 end
