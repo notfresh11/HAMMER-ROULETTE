@@ -26,15 +26,15 @@ local startRoulettePhase
 local startMaceMechanic
 
 local function getWholeMap()
-    return Workspace:FindFirstChild("WholeMap")
+    return Workspace:WaitForChild("WholeMap", 10)
 end
 
 local function getHammerSpawnModel()
     local wholeMap = getWholeMap()
     if wholeMap then
-        local hammerSpawnFolder = wholeMap:FindFirstChild("HammerSpawn")
+        local hammerSpawnFolder = wholeMap:WaitForChild("HammerSpawn", 10)
         if hammerSpawnFolder then
-            return hammerSpawnFolder:FindFirstChild("HammerModel")
+            return hammerSpawnFolder:WaitForChild("HammerModel", 10)
         end
     end
     return nil
@@ -50,7 +50,7 @@ local function teleportPlayers()
     local wholeMap = getWholeMap()
     local spawns = {}
     if wholeMap then
-        local playerSpawnFolder = wholeMap:FindFirstChild("PlayersSpawn")
+        local playerSpawnFolder = wholeMap:WaitForChild("PlayersSpawn", 10)
         if playerSpawnFolder then
             spawns = playerSpawnFolder:GetChildren()
         end
@@ -109,8 +109,14 @@ local function cleanupRound()
     -- Restart idle spinning if it was stopped
     local hammerModel = getHammerSpawnModel()
     if hammerModel and not idleSpinConnection then
+        if not hammerModel.PrimaryPart then
+            local anyPart = hammerModel:FindFirstChildWhichIsA("BasePart", true)
+            if anyPart then
+                hammerModel.PrimaryPart = anyPart
+            end
+        end
         idleSpinConnection = RunService.Heartbeat:Connect(function(dt)
-            if hammerModel and hammerModel.Parent then
+            if hammerModel and hammerModel.Parent and hammerModel.PrimaryPart then
                 local currentPivot = hammerModel:GetPivot()
                 hammerModel:PivotTo(currentPivot * CFrame.Angles(0, math.rad(90 * dt), 0))
             end
@@ -235,6 +241,12 @@ startRoulettePhase = function()
 
     -- Spin the Hammer Model like a roulette and stop pointing at the chosen player
     if hammerModel and chosenPlayer and chosenPlayer.Character and chosenPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        if not hammerModel.PrimaryPart then
+            local anyPart = hammerModel:FindFirstChildWhichIsA("BasePart", true)
+            if anyPart then
+                hammerModel.PrimaryPart = anyPart
+            end
+        end
         local targetPosition = chosenPlayer.Character.HumanoidRootPart.Position
         local initialPivot = hammerModel:GetPivot()
         local hammerPosition = initialPivot.Position
@@ -527,7 +539,7 @@ end)
 local function initializeMapObjects()
     local wholeMap = getWholeMap()
     if wholeMap then
-        local playerSpawnFolder = wholeMap:FindFirstChild("PlayersSpawn")
+        local playerSpawnFolder = wholeMap:WaitForChild("PlayersSpawn", 10)
         if playerSpawnFolder then
             for _, spawnPart in ipairs(playerSpawnFolder:GetChildren()) do
                 if spawnPart:IsA("BasePart") then
@@ -538,7 +550,7 @@ local function initializeMapObjects()
             end
         end
 
-        local hammerSpawnFolder = wholeMap:FindFirstChild("HammerSpawn")
+        local hammerSpawnFolder = wholeMap:WaitForChild("HammerSpawn", 10)
         if hammerSpawnFolder then
             -- Loop over all children just to be safe, making all baseparts inside the folder invisible (except the model which is handled below)
             for _, child in ipairs(hammerSpawnFolder:GetChildren()) do
@@ -549,14 +561,14 @@ local function initializeMapObjects()
                 end
             end
 
-            local hammerSpawnPart = hammerSpawnFolder:FindFirstChild("HammerSpawn")
+            local hammerSpawnPart = hammerSpawnFolder:WaitForChild("HammerSpawn", 10)
             if hammerSpawnPart and hammerSpawnPart:IsA("BasePart") then
                 hammerSpawnPart.Transparency = 1
                 hammerSpawnPart.Anchored = true
                 hammerSpawnPart.CanCollide = false
             end
 
-            local hammerModel = hammerSpawnFolder:FindFirstChild("HammerModel")
+            local hammerModel = hammerSpawnFolder:WaitForChild("HammerModel", 10)
             if hammerModel then
                 for _, part in ipairs(hammerModel:GetDescendants()) do
                     if part:IsA("BasePart") then
@@ -573,9 +585,9 @@ local function initializeMapObjects()
             end
         end
 
-        local hammerFolder = wholeMap:FindFirstChild("Hammer")
+        local hammerFolder = wholeMap:WaitForChild("Hammer", 10)
         if hammerFolder then
-            local tool = hammerFolder:FindFirstChild("Tool")
+            local tool = hammerFolder:WaitForChild("Tool", 10)
             if tool then
                 -- Move it to ServerStorage so players can't just pick it up from Workspace
                 tool.Parent = ServerStorage
@@ -585,8 +597,17 @@ local function initializeMapObjects()
         -- Start continuous idle spinning
         local hm = getHammerSpawnModel()
         if hm and not idleSpinConnection then
+            -- Make sure the primary part exists so PivotTo doesn't fail
+            if not hm.PrimaryPart then
+                -- Set a primary part to be the base or any central part
+                local anyPart = hm:FindFirstChildWhichIsA("BasePart", true)
+                if anyPart then
+                    hm.PrimaryPart = anyPart
+                end
+            end
+
             idleSpinConnection = RunService.Heartbeat:Connect(function(dt)
-                if hm and hm.Parent then
+                if hm and hm.Parent and hm.PrimaryPart then
                     local currentPivot = hm:GetPivot()
                     hm:PivotTo(currentPivot * CFrame.Angles(0, math.rad(90 * dt), 0))
                 end
