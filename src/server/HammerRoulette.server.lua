@@ -44,7 +44,7 @@ local function teleportPlayers()
     local wholeMap = getWholeMap()
     local spawns = {}
     if wholeMap then
-        local playerSpawnFolder = wholeMap:FindFirstChild("PlayerSpawn")
+        local playerSpawnFolder = wholeMap:FindFirstChild("PlayersSpawn")
         if playerSpawnFolder then
             spawns = playerSpawnFolder:GetChildren()
         end
@@ -99,6 +99,7 @@ local function cleanupRound()
         if char and char:FindFirstChild("Humanoid") then
             char.Humanoid.UseJumpPower = false
             char.Humanoid.JumpHeight = 7.2 -- default Roblox JumpHeight
+            char.Humanoid.JumpPower = 50 -- default Roblox JumpPower
         end
     end
 
@@ -253,8 +254,8 @@ startMaceMechanic = function(player)
     end
 
     -- Boost jump height
-    humanoid.UseJumpPower = false
-    humanoid.JumpHeight = JUMP_HEIGHT
+    humanoid.UseJumpPower = true
+    humanoid.JumpPower = 140
 
     local isFalling = false
     local mechanicConnections = {}
@@ -265,6 +266,7 @@ startMaceMechanic = function(player)
         end
         mechanicConnections = {}
         if humanoid then
+            humanoid.UseJumpPower = false
             humanoid.JumpHeight = 7.2 -- Reset to default
         end
         if hammerTool then
@@ -396,12 +398,6 @@ startMatchmaking = function()
         end
     end
 
-    -- Make HammerSpawn visible
-    local hammerSpawn = getHammerSpawn()
-    if hammerSpawn.Parent ~= Workspace then
-        hammerSpawn.Parent = Workspace
-    end
-
     teleportPlayers()
     task.wait(1)
 
@@ -439,7 +435,7 @@ end)
 local function initializeMapObjects()
     local wholeMap = getWholeMap()
     if wholeMap then
-        local playerSpawnFolder = wholeMap:FindFirstChild("PlayerSpawn")
+        local playerSpawnFolder = wholeMap:FindFirstChild("PlayersSpawn")
         if playerSpawnFolder then
             for _, spawnPart in ipairs(playerSpawnFolder:GetChildren()) do
                 if spawnPart:IsA("BasePart") then
@@ -465,6 +461,8 @@ local function initializeMapObjects()
                 for _, part in ipairs(hammerModel:GetDescendants()) do
                     if part:IsA("BasePart") then
                         part.Transparency = 1
+                        part.Anchored = true
+                        part.CanCollide = false
                     end
                 end
             end
