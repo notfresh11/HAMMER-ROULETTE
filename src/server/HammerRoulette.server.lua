@@ -50,7 +50,7 @@ local function teleportPlayers()
     local wholeMap = getWholeMap()
     local spawns = {}
     if wholeMap then
-        local playerSpawnFolder = wholeMap:FindFirstChild("PlayerSpawn")
+        local playerSpawnFolder = wholeMap:FindFirstChild("PlayersSpawn")
         if playerSpawnFolder then
             spawns = playerSpawnFolder:GetChildren()
         end
@@ -527,7 +527,7 @@ end)
 local function initializeMapObjects()
     local wholeMap = getWholeMap()
     if wholeMap then
-        local playerSpawnFolder = wholeMap:FindFirstChild("PlayerSpawn")
+        local playerSpawnFolder = wholeMap:FindFirstChild("PlayersSpawn")
         if playerSpawnFolder then
             for _, spawnPart in ipairs(playerSpawnFolder:GetChildren()) do
                 if spawnPart:IsA("BasePart") then
