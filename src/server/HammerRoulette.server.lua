@@ -8,7 +8,7 @@ local RunService = game:GetService("RunService")
 -- Configuration
 local MIN_PLAYERS = 2
 local MAX_PLAYERS = 9
-local JUMP_POWER = 100
+local JUMP_HEIGHT = 50
 local BOUNCE_POWER = 100
 local SPIN_DURATION = 3
 
@@ -19,44 +19,35 @@ local roundInProgress = false
 local currentBearer = nil
 local hammerTool = nil
 
-local function getHammerSpawn()
-    -- Assuming a Workspace.HammerSpawn model exists
-    local spawn = Workspace:FindFirstChild("HammerSpawn")
-    if not spawn then
-        -- Create a dummy one for testing if it doesn't exist
-        spawn = Instance.new("Model")
-        spawn.Name = "HammerSpawn"
-        local part = Instance.new("Part")
-        part.Name = "PrimaryPart"
-        part.Anchored = true
-        part.Parent = spawn
-        spawn.PrimaryPart = part
-        spawn.Parent = Workspace
+local function getWholeMap()
+    return Workspace:FindFirstChild("WholeMap")
+end
+
+local function getHammerSpawnModel()
+    local wholeMap = getWholeMap()
+    if wholeMap then
+        local hammerSpawnFolder = wholeMap:FindFirstChild("HammerSpawn")
+        if hammerSpawnFolder then
+            return hammerSpawnFolder:FindFirstChild("HammerModel")
+        end
     end
-    return spawn
+    return nil
 end
 
 local function getHammerToolTemplate()
-    -- Assuming ServerStorage.Hammer exists
-    local hammer = ServerStorage:FindFirstChild("Hammer")
-    if not hammer then
-        hammer = Instance.new("Tool")
-        hammer.Name = "Hammer"
-        local handle = Instance.new("Part")
-        handle.Name = "Handle"
-        handle.Size = Vector3.new(1, 4, 1)
-        handle.Parent = hammer
-        hammer.Parent = ServerStorage
-    end
-    return hammer
+    -- It was moved to ServerStorage during initialization
+    return ServerStorage:FindFirstChild("Tool")
 end
 
 -- Matchmaking and State Management
 local function teleportPlayers()
-    local spawnsFolder = Workspace:FindFirstChild("PlayerSpawns")
+    local wholeMap = getWholeMap()
     local spawns = {}
-    if spawnsFolder then
-        spawns = spawnsFolder:GetChildren()
+    if wholeMap then
+        local playerSpawnFolder = wholeMap:FindFirstChild("PlayerSpawn")
+        if playerSpawnFolder then
+            spawns = playerSpawnFolder:GetChildren()
+        end
     end
 
     for i, player in ipairs(activePlayers) do
@@ -102,17 +93,22 @@ local function cleanupRound()
         hammerTool = nil
     end
 
-    -- Reset all players jump power just in case
+    -- Reset all players jump height just in case
     for _, player in ipairs(Players:GetPlayers()) do
         local char = player.Character
         if char and char:FindFirstChild("Humanoid") then
-            char.Humanoid.JumpPower = 50 -- default
+            char.Humanoid.UseJumpPower = false
+            char.Humanoid.JumpHeight = 7.2 -- default Roblox JumpHeight
         end
     end
 
-    local hammerSpawn = Workspace:FindFirstChild("HammerSpawn")
-    if hammerSpawn then
-        hammerSpawn.Parent = ServerStorage -- Hide it
+    local hammerModel = getHammerSpawnModel()
+    if hammerModel then
+        for _, part in ipairs(hammerModel:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Transparency = 1
+            end
+        end
     end
 end
 
@@ -159,10 +155,14 @@ startRoulettePhase = function()
         return
     end
 
-    -- Make HammerSpawn visible
-    local hammerSpawn = getHammerSpawn()
-    if hammerSpawn.Parent ~= Workspace then
-        hammerSpawn.Parent = Workspace
+    -- Make HammerModel visible
+    local hammerModel = getHammerSpawnModel()
+    if hammerModel then
+        for _, part in ipairs(hammerModel:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Transparency = 0
+            end
+        end
     end
 
     -- Weighted random selection
@@ -202,8 +202,8 @@ startRoulettePhase = function()
         end
     end
 
-    -- Spin the Hammer Spawn for 3 seconds
-    if hammerSpawn.PrimaryPart then
+    -- Spin the Hammer Model for 3 seconds using PivotTo
+    if hammerModel then
         local startTime = tick()
         local connection
         connection = RunService.Heartbeat:Connect(function(dt)
@@ -211,16 +211,21 @@ startRoulettePhase = function()
                 connection:Disconnect()
                 return
             end
-            hammerSpawn:SetPrimaryPartCFrame(hammerSpawn:GetPrimaryPartCFrame() * CFrame.Angles(0, math.rad(360 * dt), 0))
+            local currentPivot = hammerModel:GetPivot()
+            hammerModel:PivotTo(currentPivot * CFrame.Angles(0, math.rad(360 * dt), 0))
         end)
         task.wait(SPIN_DURATION)
+
+        -- Hide HammerModel again
+        for _, part in ipairs(hammerModel:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Transparency = 1
+            end
+        end
     else
-        -- If no PrimaryPart, just wait
+        -- If no HammerModel, just wait
         task.wait(SPIN_DURATION)
     end
-
-    -- Hide HammerSpawn
-    hammerSpawn.Parent = ServerStorage
 
     -- Give tool to chosen player
     giveHammer(chosenPlayer)
@@ -247,8 +252,9 @@ startMaceMechanic = function(player)
         return
     end
 
-    -- Boost jump power
-    humanoid.JumpPower = JUMP_POWER
+    -- Boost jump height
+    humanoid.UseJumpPower = false
+    humanoid.JumpHeight = JUMP_HEIGHT
 
     local isFalling = false
     local mechanicConnections = {}
@@ -259,7 +265,7 @@ startMaceMechanic = function(player)
         end
         mechanicConnections = {}
         if humanoid then
-            humanoid.JumpPower = 50 -- Reset to default
+            humanoid.JumpHeight = 7.2 -- Reset to default
         end
         if hammerTool then
             hammerTool:Destroy()
@@ -362,6 +368,18 @@ startMatchmaking = function()
         task.wait(1)
     end
 
+    print("Match starting in 10 seconds...")
+    for i = 10, 1, -1 do
+        print(i .. "...")
+        task.wait(1)
+        -- Check if players dropped below minimum during countdown
+        if #Players:GetPlayers() < MIN_PLAYERS then
+            print("Not enough players anymore. Matchmaking cancelled.")
+            task.spawn(startMatchmaking)
+            return
+        end
+    end
+
     print("Starting Match...")
     roundInProgress = true
     activePlayers = {}
@@ -418,4 +436,51 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 -- Start the matchmaking loop when the server starts
+local function initializeMapObjects()
+    local wholeMap = getWholeMap()
+    if wholeMap then
+        local playerSpawnFolder = wholeMap:FindFirstChild("PlayerSpawn")
+        if playerSpawnFolder then
+            for _, spawnPart in ipairs(playerSpawnFolder:GetChildren()) do
+                if spawnPart:IsA("BasePart") then
+                    spawnPart.Transparency = 1
+                    spawnPart.Anchored = true
+                    spawnPart.CanCollide = false
+                end
+            end
+        end
+
+        local hammerSpawnFolder = wholeMap:FindFirstChild("HammerSpawn")
+        if hammerSpawnFolder then
+            local hammerSpawnPart = hammerSpawnFolder:FindFirstChild("HammerSpawn")
+            if hammerSpawnPart and hammerSpawnPart:IsA("BasePart") then
+                hammerSpawnPart.Transparency = 1
+                hammerSpawnPart.Anchored = true
+                hammerSpawnPart.CanCollide = false
+            end
+
+            local hammerModel = hammerSpawnFolder:FindFirstChild("HammerModel")
+            if hammerModel then
+                -- Hide initially
+                for _, part in ipairs(hammerModel:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.Transparency = 1
+                    end
+                end
+            end
+        end
+
+        local hammerFolder = wholeMap:FindFirstChild("Hammer")
+        if hammerFolder then
+            local tool = hammerFolder:FindFirstChild("Tool")
+            if tool then
+                -- Move it to ServerStorage so players can't just pick it up from Workspace
+                tool.Parent = ServerStorage
+            end
+        end
+    end
+end
+
+-- Initialize map and start the matchmaking loop when the server starts
+initializeMapObjects()
 task.spawn(startMatchmaking)
