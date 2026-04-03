@@ -6,7 +6,7 @@ local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 
 -- Configuration
-local MIN_PLAYERS = 4
+local MIN_PLAYERS = 2
 local MAX_PLAYERS = 9
 local JUMP_POWER = 100
 local BOUNCE_POWER = 100
