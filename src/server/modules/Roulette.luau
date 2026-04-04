@@ -119,6 +119,11 @@ function Roulette.playRouletteAnimation(targetPlayer)
     -- Because it's tilted 90deg on X, "yaw" is now effectively the Z axis relative to local space
     local _, startYaw, _ = (initialPivot * CFrame.Angles(math.rad(-90), 0, 0)):ToEulerAnglesYXZ()
     local _, targetYaw, _ = baseLookAtCFrame:ToEulerAnglesYXZ()
+
+    -- Adjust target yaw so the tip of the hammer points to the player.
+    -- Depending on the model's import orientation, we offset by 90 degrees.
+    targetYaw = targetYaw + math.rad(-90)
+
     local yawDiff = (targetYaw - startYaw + math.pi) % (2 * math.pi) - math.pi
     local totalSpins = 5
     local totalYawToTravel = yawDiff + (math.pi * 2 * totalSpins)

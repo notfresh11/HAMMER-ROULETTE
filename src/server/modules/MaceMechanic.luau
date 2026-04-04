@@ -1,11 +1,42 @@
 local MaceMechanic = {}
 local ServerStorage = game:GetService("ServerStorage")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 local currentTool = nil
 local connections = {}
 local roundActive = false
+local currentPlayer = nil
 
+-- Visual Debug Hitbox Helper
+local function createDebugHitbox(cframe, size)
+    local part = Instance.new("Part")
+    part.Size = size
+    part.CFrame = cframe
+    part.Anchored = true
+    part.CanCollide = false
+    part.Transparency = 0.5
+    part.Color = Color3.new(1, 0, 0)
+    part.Material = Enum.Material.Neon
+    part.Parent = Workspace
+
+    -- Cleanup after short time
+    task.delay(0.5, function()
+        part:Destroy()
+    end)
+end
+
+-- Create or get the RemoteEvent for the MaceAttack
+local maceEventName = "MaceAttackEvent"
+local attackEvent = ReplicatedStorage:FindFirstChild(maceEventName)
+if not attackEvent then
+    attackEvent = Instance.new("RemoteEvent")
+    attackEvent.Name = maceEventName
+    attackEvent.Parent = ReplicatedStorage
+end
+
+-- Listen for attacks from the client
 function MaceMechanic.startMechanic(player, onRoundEndCallback)
     roundActive = true
     local character = player.Character
@@ -46,9 +77,11 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
 
     local isFalling = false
 
+    currentPlayer = player
     -- Cleanup function
     local function cleanup()
         roundActive = false
+        currentPlayer = nil
         for _, conn in ipairs(connections) do
             conn:Disconnect()
         end
@@ -83,38 +116,83 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
         end
     end))
 
-    -- Listen for hits on the tool
-    if currentTool then
-        for _, part in ipairs(currentTool:GetDescendants()) do
-            if part:IsA("BasePart") then
-                table.insert(connections, part.Touched:Connect(function(hit)
-                    if not roundActive then return end
+    -- Spatial query attack logic replaces the `.Touched` event
+    local lastAttackTime = 0
+    local ATTACK_COOLDOWN = 0.5
 
-                    -- Must be falling
-                    local inAir = (humanoid:GetState() == Enum.HumanoidStateType.Freefall)
-                    if not inAir then return end
+    if attackEvent then
+        table.insert(connections, attackEvent.OnServerEvent:Connect(function(plr, debugVisible)
+            if not roundActive or plr ~= player then return end
 
-                    local hitChar = hit.Parent
-                    if not hitChar or hitChar == character then return end
+            local now = tick()
+            if now - lastAttackTime < ATTACK_COOLDOWN then return end
 
+            -- Must be falling
+            local inAir = (humanoid:GetState() == Enum.HumanoidStateType.Freefall)
+            if not inAir then return end
+
+            lastAttackTime = now
+
+            local boxSize = Vector3.new(12, 12, 12)
+            -- Position slightly in front
+            local boxCFrame = rootPart.CFrame * CFrame.new(0, 0, -3)
+
+            if debugVisible then
+                createDebugHitbox(boxCFrame, boxSize)
+            end
+
+            local overlapParams = OverlapParams.new()
+            overlapParams.FilterType = Enum.RaycastFilterType.Exclude
+            overlapParams.FilterDescendantsInstances = {character}
+
+            local partsInBox = Workspace:GetPartBoundsInBox(boxCFrame, boxSize, overlapParams)
+
+            local closestPlayer = nil
+            local closestDist = math.huge
+            local bestDot = -1
+
+            for _, part in ipairs(partsInBox) do
+                local hitChar = part.Parent
+                if hitChar and hitChar:FindFirstChild("Humanoid") then
                     local hitHumanoid = hitChar:FindFirstChild("Humanoid")
-                    if hitHumanoid and hitHumanoid.Health > 0 then
-                        local hitPlayer = Players:GetPlayerFromCharacter(hitChar)
-                        if hitPlayer then
-                            -- Kill victim
-                            hitHumanoid.Health = 0
-                            print(player.Name .. " l-a ucis pe " .. hitPlayer.Name .. " cu ciocanul!")
+                    if hitHumanoid.Health > 0 then
+                        local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
+                        if targetRoot then
+                            local dirToTarget = (targetRoot.Position - rootPart.Position).Unit
+                            local lookVector = rootPart.CFrame.LookVector
+                            -- Dot product gives 1 if looking exactly at them, -1 if behind
+                            local dot = lookVector:Dot(dirToTarget)
 
-                            -- The Bounce (Apply Impulse upwards)
-                            rootPart:ApplyImpulse(Vector3.new(0, rootPart.AssemblyMass * 100, 0))
-
-                            -- Round continues, they can fall and hit again!
-                            isFalling = true
+                            -- Must be generally in front (dot > 0)
+                            if dot > 0.3 then
+                                local dist = (rootPart.Position - targetRoot.Position).Magnitude
+                                -- Prioritize closeness, but could also prioritize `dot`
+                                if dist < closestDist then
+                                    closestDist = dist
+                                    closestPlayer = hitChar
+                                end
+                            end
                         end
                     end
-                end))
+                end
             end
-        end
+
+            if closestPlayer then
+                local hitHumanoid = closestPlayer:FindFirstChild("Humanoid")
+                local hitPlayer = Players:GetPlayerFromCharacter(closestPlayer)
+
+                if hitHumanoid and hitPlayer then
+                    hitHumanoid.Health = 0
+                    print(player.Name .. " l-a ucis pe " .. hitPlayer.Name .. " cu un atac mid-air!")
+
+                    -- The Bounce (Apply Impulse upwards)
+                    rootPart:ApplyImpulse(Vector3.new(0, rootPart.AssemblyMass * 100, 0))
+
+                    -- Round continues, they can fall and hit again!
+                    isFalling = true
+                end
+            end
+        end))
     end
 
     -- Fail safes
