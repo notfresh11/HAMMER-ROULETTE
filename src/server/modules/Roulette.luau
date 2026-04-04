@@ -134,9 +134,6 @@ function Roulette.playRouletteAnimation(targetPlayer, currentHammerInstance)
         end
     end)
 
-    -- Find the 'Tip' part if it exists to precisely calculate the forward vector
-    local tipPart = hammerModel:FindFirstChild("Tip", true)
-
     -- We create a flat direction vector pointing towards the target player
     local dirToTarget = (Vector3.new(targetPos.X, initialPivot.Position.Y, targetPos.Z) - initialPivot.Position).Unit
     if dirToTarget.Magnitude == 0 then dirToTarget = Vector3.new(0, 0, -1) end
@@ -144,35 +141,41 @@ function Roulette.playRouletteAnimation(targetPlayer, currentHammerInstance)
     -- We calculate the exact angle to the target player in global space
     local targetAngleGlobal = math.atan2(-dirToTarget.Z, dirToTarget.X)
 
-    -- Determine how the model's 'Tip' is oriented internally
-    local internalTipOffsetAngle = math.rad(-90) -- Fallback
-    if tipPart then
-        -- Imagine the model standing at origin with no rotation. Where is the Tip?
-        -- We can find the Tip's local position relative to the model's primary pivot.
-        local localTipPos = initialPivot:ToObjectSpace(tipPart.CFrame).Position
+    -- Find the 'Tip' part if it exists to calculate its current direction
+    local tipPart = hammerModel:FindFirstChild("Tip", true)
 
-        -- Because the model is tilted 90 degrees on X *after* the yaw rotation,
-        -- its local axes are rotated. The global "Forward/Z" direction actually corresponds to the local Y-axis when lying flat.
-        -- We just extract the raw 2D angle of the tip on the model's local "floor" plane (X and Y, because it tilts down).
-        internalTipOffsetAngle = math.atan2(-localTipPos.Y, localTipPos.X)
+    local tipDirectionAngle = 0
+    if tipPart then
+        -- Find the current global direction of the tip relative to the pivot center on the XZ plane
+        -- The hammer is already lying flat, so the Tip is displaced horizontally from the center.
+        local tipDir = (Vector3.new(tipPart.Position.X, initialPivot.Position.Y, tipPart.Position.Z) - initialPivot.Position).Unit
+        -- Check if it's not a zero vector (which happens if Tip is perfectly above/below center)
+        if tipDir.Magnitude > 0.001 then
+            tipDirectionAngle = math.atan2(-tipDir.Z, tipDir.X)
+        end
+    else
+        -- Fallback: If no Tip, we just assume its local Top/Up vector is "forward" when lying flat.
+        -- But because it's rotated 90 on X, its local Y axis points along global Z.
+        tipDirectionAngle = math.atan2(-initialPivot.UpVector.Z, initialPivot.UpVector.X)
     end
 
-    -- We subtract the internal offset from the desired global angle to find the exact Yaw the model must have
-    local finalYaw = targetAngleGlobal - internalTipOffsetAngle
+    -- Calculate how much we need to rotate globally on the Y axis to align the tip to the target
+    -- Start by finding the shortest angular distance
+    local angleDiff = (targetAngleGlobal - tipDirectionAngle)
 
-    -- Construct the final base LookAt CFrame using this absolute yaw.
-    local baseLookAtCFrame = CFrame.new(initialPivot.Position) * CFrame.Angles(0, finalYaw, 0)
-    -- Then tilt it 90 degrees to lay flat.
-    local targetPivot = baseLookAtCFrame * CFrame.Angles(math.rad(90), 0, 0)
+    -- Normalize angle difference to be between -pi and pi
+    angleDiff = (angleDiff + math.pi) % (2 * math.pi) - math.pi
 
-    -- Extract the Z-axis rotation (spin on the ground) from the initial and target CFrames
-    -- Because it's tilted 90deg on X, "yaw" is now effectively the Z axis relative to local space
-    local _, startYaw, _ = (initialPivot * CFrame.Angles(math.rad(-90), 0, 0)):ToEulerAnglesYXZ()
-    local _, targetYaw, _ = baseLookAtCFrame:ToEulerAnglesYXZ()
-
-    local yawDiff = (targetYaw - startYaw + math.pi) % (2 * math.pi) - math.pi
     local totalSpins = 5
-    local totalYawToTravel = yawDiff + (math.pi * 2 * totalSpins)
+    -- The total rotation we want to apply around the global Y axis
+    local totalYawToTravel = angleDiff + (math.pi * 2 * totalSpins)
+
+    -- Because the hammer is already flat on the ground (from MapManager and Idle animation),
+    -- initialPivot represents a flat hammer. We simply want to rotate this entire flat structure
+    -- around the global Y-axis passing through its center.
+
+    -- Target Pivot is the initial pivot rotated globally around its position
+    local targetFlatPivot = CFrame.new(initialPivot.Position) * CFrame.Angles(0, totalYawToTravel, 0) * (initialPivot - initialPivot.Position)
 
     local connection
     connection = RunService.Heartbeat:Connect(function(dt)
@@ -185,19 +188,20 @@ function Roulette.playRouletteAnimation(targetPlayer, currentHammerInstance)
         if elapsed >= SPIN_DURATION then
             connection:Disconnect()
             if isModel then
-                hammerModel:PivotTo(targetPivot)
+                hammerModel:PivotTo(targetFlatPivot)
             else
-                hammerModel.CFrame = targetPivot
+                hammerModel.CFrame = targetFlatPivot
             end
             -- Allow idle spinner to resume
             hammerModel:SetAttribute("IsRoulette", false)
             return
         end
 
-        local currentYaw = startYaw + (totalYawToTravel * easeOutAlpha)
+        local currentYaw = totalYawToTravel * easeOutAlpha
 
-        -- Build the CFrame: Start at position, apply yaw rotation, then tilt 90deg to lie flat
-        local finalPivot = CFrame.new(initialPivot.Position) * CFrame.Angles(0, currentYaw, 0) * CFrame.Angles(math.rad(90), 0, 0)
+        -- Create a pure global Y-axis rotation and apply it to the initial orientation.
+        local rotationStep = CFrame.Angles(0, currentYaw, 0)
+        local finalPivot = CFrame.new(initialPivot.Position) * rotationStep * (initialPivot - initialPivot.Position)
 
         -- To prevent fighting with the idle animation, we override its CFrame entirely here
         if isModel then
