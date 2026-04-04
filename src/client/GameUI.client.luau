@@ -289,22 +289,19 @@ local function setupUI()
         local shopFrame = menus.ShopButton
 
         -- References to the internal content frames
-        local frameAbilities = shopFrame:FindFirstChild("FrameAbilities")
+        local frameAbilities = shopFrame:FindFirstChild("FrameAbbillities")
         local frameCurrency = shopFrame:FindFirstChild("FrameCurrency")
         local frameSkins = shopFrame:FindFirstChild("FrameSkins")
         local frameVFX = shopFrame:FindFirstChild("FrameVFX")
 
         -- References to the tab buttons (as seen in hierarchy, they are direct children of MainFrame)
-        local abilitiesBtn = shopFrame:FindFirstChild("AbilitiesButton")
+        local abilitiesBtn = shopFrame:FindFirstChild("AbbillitiesButton")
         local currencyBtn = shopFrame:FindFirstChild("CurrencyButton")
         local skinsBtn = shopFrame:FindFirstChild("SkinsButton")
         local vfxBtn = shopFrame:FindFirstChild("VFXButton")
 
-        -- Ref to the Exit Button
-        local exitBtn = nil
-        if currencyBtn then
-            exitBtn = currencyBtn:FindFirstChild("ExitButton")
-        end
+        -- Ref to the Exit Button (Expecting it directly under shopFrame now to prevent hover scaling inheritance)
+        local exitBtn = shopFrame:FindFirstChild("ExitButton")
 
         -- Default State: Only Currency visible
         local function resetShopTabs()
@@ -424,16 +421,14 @@ local function setupUI()
     -- Apply to shop internal buttons
     if menus.ShopButton then
         local shopFrame = menus.ShopButton
-        bindHoverAnimation(shopFrame:FindFirstChild("AbilitiesButton"))
+        bindHoverAnimation(shopFrame:FindFirstChild("AbbillitiesButton"))
         bindHoverAnimation(shopFrame:FindFirstChild("SkinsButton"))
         bindHoverAnimation(shopFrame:FindFirstChild("VFXButton"))
         bindHoverAnimation(shopFrame:FindFirstChild("CurrencyButton"))
         bindHoverAnimation(shopFrame:FindFirstChild("CoinsButton"))
 
-        local cBtn = shopFrame:FindFirstChild("CurrencyButton")
-        if cBtn then
-            bindHoverAnimation(cBtn:FindFirstChild("ExitButton"))
-        end
+        -- Extracted ExitButton out of CurrencyButton directly to MainFrame
+        bindHoverAnimation(shopFrame:FindFirstChild("ExitButton"))
     end
 
     -- Hover Animations for CornerButtons (Darken Background/Image)
