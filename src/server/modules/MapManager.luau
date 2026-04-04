@@ -102,7 +102,9 @@ function MapManager.chooseAndSpawnMap()
         totalWeight = totalWeight + (mapWeights[map.Name] or 1)
     end
 
-    local randomValue = math.random() * totalWeight
+    -- Folosim Random.new() care este mult mai calitativ și produce entropie reală în Roblox
+    local rng = Random.new()
+    local randomValue = rng:NextNumber(0, totalWeight)
     local chosenMapTemplate = availableMaps[1]
     local currentSum = 0
 
@@ -133,8 +135,10 @@ function MapManager.chooseAndSpawnMap()
         currentMapInstance.PrimaryPart = hammerSpawnPart
     end
 
-    -- Teleportam la SpawnMap (Ancora)
-    local spawnMapTarget = Workspace:WaitForChild("SpawnMap", 5)
+    -- Teleportam la SpawnMap (Ancora) - care este în interiorul folderului WholeMap acum!
+    local wholeMap = Workspace:FindFirstChild("WholeMap")
+    local spawnMapTarget = wholeMap and wholeMap:FindFirstChild("SpawnMap")
+
     if spawnMapTarget and currentMapInstance.PrimaryPart then
         -- Ne asiguram ca e plat pe pamant, luam doar pozitiile si le potrivim
         -- Y-ul trebuie sa tina cont de inaltimea block-urilor
@@ -142,7 +146,7 @@ function MapManager.chooseAndSpawnMap()
         local targetCFrame = CFrame.new(spawnMapTarget.Position + Vector3.new(0, yOffset, 0))
         currentMapInstance:PivotTo(targetCFrame)
     else
-        warn("MapManager: SpawnMap lipseste sau harta nu are PrimaryPart! A rămas pe poziția originală.")
+        warn("MapManager: SpawnMap lipseste din WholeMap sau harta nu are PrimaryPart! A rămas pe poziția originală.")
     end
 
     -- Ascundem block-ul de la HammerSpawn să nu se mai vadă ochiului
