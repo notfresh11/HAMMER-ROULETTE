@@ -246,5 +246,5 @@ local function gameLoop()
 end
 
 -- Start
-task.spawn(setupMap)
-task.spawn(gameLoop)
+setupMap()
+gameLoop()

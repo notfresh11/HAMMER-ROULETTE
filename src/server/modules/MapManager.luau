@@ -26,9 +26,26 @@ function MapManager.hideAllMaps()
     end
 
     -- Muta HammerModel in ServerStorage
-    local hammerModel = wholeMap:FindFirstChild("HammerModel")
-    if hammerModel then
-        hammerModel.Parent = mapStorage
+    local hammerModelFolder = wholeMap:FindFirstChild("HammerModel")
+    if hammerModelFolder then
+        -- Dacă este folder (cum ai în poză), vrem să scoatem fix Modelul de ciocan din el
+        if hammerModelFolder:IsA("Folder") then
+            local actualModel = hammerModelFolder:FindFirstChild("HammerModel") or hammerModelFolder:FindFirstChildWhichIsA("Model")
+            if actualModel then
+                actualModel.Parent = mapStorage
+                actualModel.Name = "HammerModel" -- Standardizăm numele
+                hammerModelFolder:Destroy()
+            else
+                -- Dacă nu găsim un Model, mutăm folderul cumva convertit
+                local hm = Instance.new("Model")
+                hm.Name = "HammerModel"
+                for _, d in ipairs(hammerModelFolder:GetChildren()) do d.Parent = hm end
+                hm.Parent = mapStorage
+                hammerModelFolder:Destroy()
+            end
+        else
+            hammerModelFolder.Parent = mapStorage
+        end
     end
 
     -- Muta hărțile in ServerStorage si converteste-le in Modele daca sunt Foldere
@@ -39,8 +56,10 @@ function MapManager.hideAllMaps()
             if child:IsA("Folder") then
                 mapModel = Instance.new("Model")
                 mapModel.Name = child.Name
-                for _, descendant in ipairs(child:GetChildren()) do
-                    descendant.Parent = mapModel
+                -- Trebuie să folosim un while pt că GetChildren() dintr-un array se scurtează la reparentare
+                while #child:GetChildren() > 0 do
+                    local elem = child:GetChildren()[1]
+                    elem.Parent = mapModel
                 end
                 child:Destroy()
             else
@@ -136,7 +155,7 @@ function MapManager.chooseAndSpawnMap()
     -- Face si PlayerSpawns invizibile
     local playerSpawnsFolder = currentMapInstance:FindFirstChild("PlayerSpawn")
     if playerSpawnsFolder then
-        for _, p in ipairs(playerSpawnsFolder:GetChildren()) do
+        for _, p in ipairs(playerSpawnsFolder:GetDescendants()) do
             if p:IsA("BasePart") then
                 p.Transparency = 1
                 p.Anchored = true
