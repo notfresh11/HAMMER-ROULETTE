@@ -154,6 +154,9 @@ local function gameLoop()
         local success = Matchmaking.waitForPlayers()
 
         if success then
+            -- Așteptăm cele 2 secunde cât timp este afișat mesajul "The Game Has Started"
+            task.wait(2)
+
             -- Meciul începe, înregistrăm toți jucătorii care participă la acest meci
             local activePlayers = Players:GetPlayers()
             print("MainLoop: Meciul a început cu " .. #activePlayers .. " jucători!")

@@ -22,29 +22,38 @@ function Matchmaking.waitForPlayers()
     local COUNTDOWN_SOUND = "rbxassetid://110001162763213"
     local START_SOUND = "rbxassetid://77736543307386"
 
-    for i = 10, 1, -1 do
-        print(i .. "...")
+    local startTick = os.clock()
+    local i = 10
 
-        -- Logică culori
-        local color = Color3.new(1, 0, 0) -- Roșu default (10 - 3)
-        if i == 2 then
-            color = Color3.new(1, 1, 0) -- Galben
-        elseif i == 1 then
-            color = Color3.new(0, 1, 0) -- Verde
+    while i >= 1 do
+        -- Așteptăm precis folosind os.clock() ca să fim la fix o secundă diferență
+        if os.clock() - startTick >= (10 - i) then
+            print(i .. "...")
+
+            -- Logică culori
+            local color = Color3.new(1, 0, 0) -- Roșu default (10 - 3)
+            if i == 2 then
+                color = Color3.new(1, 1, 0) -- Galben
+            elseif i == 1 then
+                color = Color3.new(0, 1, 0) -- Verde
+            end
+
+            showCountdownEvent:FireAllClients(i, color, COUNTDOWN_SOUND)
+            i = i - 1
+
+            if #Players:GetPlayers() < MIN_PLAYERS then
+                print("Matchmaking anulat: Număr insuficient de jucători.")
+                showTextEvent:FireAllClients("Matchmaking cancelled", Color3.new(1, 0, 0), "")
+                task.wait(2)
+                hideTextEvent:FireAllClients()
+                return false
+            end
         end
-
-        showCountdownEvent:FireAllClients(i, color, COUNTDOWN_SOUND)
-
-        task.wait(1)
-        if #Players:GetPlayers() < MIN_PLAYERS then
-            print("Matchmaking anulat: Număr insuficient de jucători.")
-            showTextEvent:FireAllClients("Matchmaking cancelled", Color3.new(1, 0, 0), "")
-            task.wait(2)
-            hideTextEvent:FireAllClients()
-            return false
-        end
+        task.wait() -- Așteptăm doar un singur cadru pentru precizie
     end
 
+    -- Delay scurt ca să ne asigurăm că termină beep-ul pentru 1 înainte să bată Start
+    task.wait(1)
     showTextEvent:FireAllClients("The Game Has Started", Color3.new(0, 1, 0), START_SOUND)
     task.delay(2, function()
         hideTextEvent:FireAllClients()

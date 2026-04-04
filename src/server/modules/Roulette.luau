@@ -151,13 +151,18 @@ function Roulette.playRouletteAnimation(targetPlayer)
 
     -- Countdown loop for the Roulette
     task.spawn(function()
-        for i = SPIN_DURATION, 1, -1 do
-            local color = Color3.new(1, 0, 0)
-            if i == 2 then color = Color3.new(1, 1, 0)
-            elseif i == 1 then color = Color3.new(0, 1, 0) end
+        local startTick = os.clock()
+        local i = SPIN_DURATION
+        while i >= 1 do
+            if os.clock() - startTick >= (SPIN_DURATION - i) then
+                local color = Color3.new(1, 0, 0)
+                if i == 2 then color = Color3.new(1, 1, 0)
+                elseif i == 1 then color = Color3.new(0, 1, 0) end
 
-            showCountdownEvent:FireAllClients(i, color, COUNTDOWN_SOUND)
-            task.wait(1)
+                showCountdownEvent:FireAllClients(i, color, COUNTDOWN_SOUND)
+                i = i - 1
+            end
+            task.wait()
         end
     end)
 
@@ -205,8 +210,8 @@ function Roulette.playRouletteAnimation(targetPlayer)
 
     task.wait(SPIN_DURATION)
 
-    -- Finalize UI
-    showTextEvent:FireAllClients("Player has the Mace !", Color3.new(0, 1, 0), START_SOUND)
+    -- Finalize UI with the chosen player's name
+    showTextEvent:FireAllClients(targetPlayer.Name .. " has the Mace !", Color3.new(0, 1, 0), START_SOUND)
     task.delay(2, function()
         hideTextEvent:FireAllClients()
     end)
