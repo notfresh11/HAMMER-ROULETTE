@@ -34,7 +34,20 @@ function MapManager.hideAllMaps()
                 -- Dacă nu găsim un Model, mutăm folderul cumva convertit
                 local hm = Instance.new("Model")
                 hm.Name = "HammerModel"
-                for _, d in ipairs(hammerModelFolder:GetChildren()) do d.Parent = hm end
+                local unionPart = nil
+                for _, d in ipairs(hammerModelFolder:GetChildren()) do
+                    d.Parent = hm
+                    if d:IsA("UnionOperation") or d.Name == "Union" then
+                        unionPart = d
+                    end
+                end
+
+                if unionPart then
+                    hm.PrimaryPart = unionPart
+                else
+                    hm.PrimaryPart = hm:FindFirstChildWhichIsA("BasePart")
+                end
+
                 hm.Parent = mapStorage
                 hammerModelFolder:Destroy()
             end
@@ -184,13 +197,14 @@ function MapManager.chooseAndSpawnMap()
                 end
             end
             if currentHammerInstance.PrimaryPart then
-                hammerHeight = currentHammerInstance.PrimaryPart.Size.Z / 2
+                -- Try to use size from union if it's the primary part, fallback to size Y or Z based on standard orientation
+                hammerHeight = currentHammerInstance.PrimaryPart.Size.Y / 2
             end
         else
             currentHammerInstance.Anchored = true
             currentHammerInstance.CanCollide = false
             if currentHammerInstance:IsA("BasePart") then
-                hammerHeight = currentHammerInstance.Size.Z / 2
+                hammerHeight = currentHammerInstance.Size.Y / 2
             end
         end
 
