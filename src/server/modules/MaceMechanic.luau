@@ -72,6 +72,25 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
 
     local isFalling = false
 
+    -- Create Permanent Hitbox Part
+    local hitboxPart = Instance.new("Part")
+    hitboxPart.Name = "MaceHitbox"
+    hitboxPart.Size = Vector3.new(12, 12, 12)
+    -- Position slightly in front
+    hitboxPart.CFrame = rootPart.CFrame * CFrame.new(0, 0, -3)
+    hitboxPart.Anchored = false
+    hitboxPart.CanCollide = false
+    hitboxPart.Massless = true
+    hitboxPart.Transparency = 1
+    hitboxPart.Color = Color3.new(1, 0, 0)
+    hitboxPart.Material = Enum.Material.ForceField
+    hitboxPart.Parent = character
+
+    local hitboxWeld = Instance.new("WeldConstraint")
+    hitboxWeld.Part0 = rootPart
+    hitboxWeld.Part1 = hitboxPart
+    hitboxWeld.Parent = hitboxPart
+
     currentPlayer = player
     -- Cleanup function
     local function cleanup()
@@ -85,6 +104,10 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
         if currentTool then
             currentTool:Destroy()
             currentTool = nil
+        end
+
+        if hitboxPart then
+            hitboxPart:Destroy()
         end
 
         if humanoid then
@@ -116,7 +139,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
     local ATTACK_COOLDOWN = 0.5
 
     if attackEvent then
-        table.insert(connections, attackEvent.OnServerEvent:Connect(function(plr, debugVisible)
+        table.insert(connections, attackEvent.OnServerEvent:Connect(function(plr)
             if not roundActive or plr ~= player then return end
 
             local now = tick()
@@ -128,13 +151,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
 
             lastAttackTime = now
 
-            local boxSize = Vector3.new(12, 12, 12)
-            -- Position slightly in front
-            local boxCFrame = rootPart.CFrame * CFrame.new(0, 0, -3)
-
-            if debugVisible then
-                createDebugHitbox(boxCFrame, boxSize)
-            end
+            local boxSize = hitboxPart.Size
+            local boxCFrame = hitboxPart.CFrame
 
             local overlapParams = OverlapParams.new()
             overlapParams.FilterType = Enum.RaycastFilterType.Exclude
