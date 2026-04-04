@@ -260,16 +260,25 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
                         -- Prevent the default Roblox "Oof" / death sound from playing
                         -- Roblox client audio replication sometimes caches the sound before Destroy propagates.
                         -- Setting Volume = 0 and overriding the ID prevents it entirely.
-                        local victimRoot = hitChar:FindFirstChild("HumanoidRootPart")
-                        if victimRoot then
-                            local defaultDeathSound = victimRoot:FindFirstChild("Died")
-                            if defaultDeathSound and defaultDeathSound:IsA("Sound") then
-                                defaultDeathSound.Volume = 0
-                                defaultDeathSound.SoundId = ""
-                                defaultDeathSound:Stop()
-                                defaultDeathSound:Destroy()
+                        local function disableDeathSound(part)
+                            if part then
+                                for _, child in ipairs(part:GetChildren()) do
+                                    if child:IsA("Sound") and (child.Name == "Died" or child.Name == "Oof") then
+                                        child.Volume = 0
+                                        child.SoundId = ""
+                                        child:Stop()
+                                        child:Destroy()
+                                    end
+                                end
                             end
                         end
+
+                        -- Căutăm sunetul de death și în RootPart și în Head (de obicei apare acolo)
+                        local victimRoot = hitChar:FindFirstChild("HumanoidRootPart")
+                        local victimHead = hitChar:FindFirstChild("Head")
+
+                        disableDeathSound(victimRoot)
+                        disableDeathSound(victimHead)
 
                         hitHumanoid.Health = 0
                         print(player.Name .. " l-a ucis automat pe " .. hitPlayer.Name .. " (Auto-Hit)!")

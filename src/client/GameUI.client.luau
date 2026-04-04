@@ -13,7 +13,7 @@ screenGui.Parent = playerGui
 local textLabel = Instance.new("TextLabel")
 textLabel.Name = "CenterText"
 textLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-textLabel.Size = UDim2.new(1, 0, 0.15, 0) -- Făcut textul mai mic conform cerinței (de la 0.35 la 0.15)
+textLabel.Size = UDim2.new(1, 0, 0.1, 0) -- Făcut textul și mai mic (de la 0.15 la 0.1) pentru countdown
 textLabel.Position = UDim2.new(0.5, 0, 0.5, 0) -- Exact pe centrul ecranului
 textLabel.BackgroundTransparency = 1
 -- Schimbat pe fontul FredokaOne dorit de utilizator
@@ -163,7 +163,7 @@ if mainUI then
         end)
     end
 
-    -- Menu Toggling Logic and Cache Sizes for Pop-up Animation
+    -- Menu Toggling Logic
     local menus = {
         ShopButton = shopGui and shopGui:FindFirstChild("MainFrame"),
         QuestsButton = questsGui and questsGui:FindFirstChild("MainFrame"),
@@ -171,15 +171,6 @@ if mainUI then
         SettingsButton = settingsGui and settingsGui:FindFirstChild("MainFrame"),
         DiscordButton = discordGui and discordGui:FindFirstChild("MainFrame")
     }
-
-    local originalMenuSizes = {}
-    for name, frame in pairs(menus) do
-        if frame then
-            originalMenuSizes[name] = frame.Size
-            -- Eliminăm suprascrierea AnchorPoint-ului pentru ca UI-ul să nu se mute
-            -- de la poziția setată în Studio de către tine (cum era cazul la meniul de Quests).
-        end
-    end
 
     local function hideAllMenus()
         for _, frame in pairs(menus) do
@@ -197,6 +188,8 @@ if mainUI then
     if toggleMainUiEvent then
         toggleMainUiEvent.OnClientEvent:Connect(function(isVisible)
             mainUI.Enabled = isVisible
+
+            -- Când intrăm în meci, ascundem conținutul (Visible = false) din ecranele secundare
             if not isVisible then
                 hideAllMenus()
             end
@@ -219,18 +212,6 @@ if mainUI then
 
                 if targetFrame and not wasVisible then
                     targetFrame.Visible = true
-
-                    -- Pop-up Animation
-                    local originalSize = originalMenuSizes[buttonName]
-                    if originalSize then
-                        -- Start small
-                        targetFrame.Size = UDim2.new(0, 0, 0, 0)
-
-                        -- Tween back to original size with a softer pop-up
-                        local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
-                        local tween = TweenService:Create(targetFrame, tweenInfo, {Size = originalSize})
-                        tween:Play()
-                    end
                 end
             end)
         end
