@@ -89,6 +89,9 @@ function Roulette.playRouletteAnimation(targetPlayer)
         end
     end
 
+    -- Tell the idle spinner to stop fighting us
+    hammerModel:SetAttribute("IsRoulette", true)
+
     local initialPivot = hammerModel:GetPivot()
     local targetPos = Vector3.new(0,0,0)
 
@@ -119,6 +122,8 @@ function Roulette.playRouletteAnimation(targetPlayer)
         if elapsed >= SPIN_DURATION then
             connection:Disconnect()
             hammerModel:PivotTo(targetPivot)
+            -- Allow idle spinner to resume (it won't immediately rotate visually back, it will resume smoothly from where we left it)
+            hammerModel:SetAttribute("IsRoulette", false)
             return
         end
 

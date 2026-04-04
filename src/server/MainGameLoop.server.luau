@@ -46,10 +46,11 @@ local function setupMap()
             -- Continuous Idle Spin
             RunService.Heartbeat:Connect(function(dt)
                 if hammerModel and hammerModel.Parent and hammerModel.PrimaryPart then
-                    -- Only spin if it isn't currently being manipulated by the Roulette logic
-                    -- The Roulette logic will quickly rotate it, so we let it overlap or we could just constantly spin it slowly
-                    local currentPivot = hammerModel:GetPivot()
-                    hammerModel:PivotTo(currentPivot * CFrame.Angles(0, math.rad(90 * dt), 0))
+                    -- Stop idle spin when the active roulette animation takes over
+                    if not hammerModel:GetAttribute("IsRoulette") then
+                        local currentPivot = hammerModel:GetPivot()
+                        hammerModel:PivotTo(currentPivot * CFrame.Angles(0, math.rad(90 * dt), 0))
+                    end
                 end
             end)
         end
@@ -96,5 +97,5 @@ local function gameLoop()
 end
 
 -- Start
-setupMap()
+task.spawn(setupMap)
 task.spawn(gameLoop)
