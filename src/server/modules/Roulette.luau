@@ -75,8 +75,17 @@ function Roulette.playRouletteAnimation(targetPlayer)
         if anyPart then
             hammerModel.PrimaryPart = anyPart
         else
+            warn("Eroare: HammerModel nu are niciun BasePart pentru a fi folosit ca PrimaryPart!")
             task.wait(3)
             return
+        end
+    end
+
+    -- Fix physics interference: ensure all parts are firmly anchored so CFrame pivoting isn't overwritten by gravity/physics engine.
+    for _, part in ipairs(hammerModel:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Anchored = true
+            part.CanCollide = false
         end
     end
 
@@ -115,6 +124,8 @@ function Roulette.playRouletteAnimation(targetPlayer)
 
         local currentYaw = totalYawToTravel * easeOutAlpha
         local finalPivot = initialPivot * CFrame.Angles(0, currentYaw, 0)
+
+        -- To prevent fighting with the idle animation, we override its CFrame entirely here
         hammerModel:PivotTo(finalPivot)
     end)
 
