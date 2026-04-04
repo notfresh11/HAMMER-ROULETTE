@@ -6,7 +6,7 @@ local Workspace = game:GetService("Workspace")
 
 -- Function to initialize map elements (make spawns invisible)
 local function setupMap()
-    local spawns = Workspace:FindFirstChild("PlayerSpawns") or Workspace:FindFirstChild("PlayersSpawn")
+    local spawns = Workspace:WaitForChild("PlayerSpawn", 10)
     if spawns then
         for _, part in ipairs(spawns:GetChildren()) do
             if part:IsA("BasePart") then
@@ -17,7 +17,7 @@ local function setupMap()
         end
     end
 
-    local hammerSpawn = Workspace:FindFirstChild("HammerSpawn")
+    local hammerSpawn = Workspace:WaitForChild("HammerSpawn", 10)
     if hammerSpawn then
         for _, child in ipairs(hammerSpawn:GetChildren()) do
             if child:IsA("BasePart") and child.Name ~= "HammerModel" then

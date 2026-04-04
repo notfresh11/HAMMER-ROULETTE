@@ -56,15 +56,15 @@ end
 
 function Roulette.playRouletteAnimation(targetPlayer)
     print("Roulette: Începem animația ruletă către", targetPlayer.Name)
-    local hammerSpawn = Workspace:FindFirstChild("HammerSpawn")
+    local hammerSpawn = Workspace:WaitForChild("HammerSpawn", 10)
     if not hammerSpawn then
-        warn("Eroare: Nu am găsit folderul/modelul HammerSpawn în Workspace!")
+        warn("Eroare: Nu am găsit folderul HammerSpawn în Workspace!")
         task.wait(3) -- Wait out the time anyway
         return
     end
 
-    -- Assuming HammerSpawn might be a folder or direct model. Let's look for the model.
-    local hammerModel = hammerSpawn:FindFirstChild("HammerModel") or hammerSpawn
+    -- Look for the HammerModel inside the folder
+    local hammerModel = hammerSpawn:WaitForChild("HammerModel", 10)
     if not hammerModel:IsA("Model") then
         task.wait(3)
         return

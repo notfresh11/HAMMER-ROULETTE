@@ -27,8 +27,8 @@ end
 
 function Matchmaking.teleportPlayersToSpawns()
     print("Matchmaking: Teleportăm jucătorii...")
-    -- Support both naming conventions just in case
-    local spawnFolder = Workspace:FindFirstChild("PlayerSpawns") or Workspace:FindFirstChild("PlayersSpawn")
+    -- Use the exact folder name from the screenshot: "PlayerSpawn"
+    local spawnFolder = Workspace:WaitForChild("PlayerSpawn", 10)
     local spawns = {}
 
     if spawnFolder then
@@ -38,7 +38,7 @@ function Matchmaking.teleportPlayersToSpawns()
             end
         end
     else
-        warn("Eroare: Nu am găsit folderul PlayerSpawns în Workspace!")
+        warn("Eroare: Nu am găsit folderul PlayerSpawn în Workspace!")
     end
 
     local currentPlayers = Players:GetPlayers()
