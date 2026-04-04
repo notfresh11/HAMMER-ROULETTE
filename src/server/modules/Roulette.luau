@@ -109,7 +109,8 @@ function Roulette.playRouletteAnimation(targetPlayer)
 
     -- For a flat-laying object, the "LookAt" logic changes.
     -- We create a CFrame that faces the target, and THEN tilt it 90 degrees on X to lie flat.
-    local baseLookAtCFrame = CFrame.new(initialPivot.Position, Vector3.new(targetPos.X, initialPivot.Position.Y, targetPos.Z))
+    -- To align the visual model (so the tip points at the player), we must apply a Y-axis offset here.
+    local baseLookAtCFrame = CFrame.new(initialPivot.Position, Vector3.new(targetPos.X, initialPivot.Position.Y, targetPos.Z)) * CFrame.Angles(0, math.rad(-90), 0)
     local targetPivot = baseLookAtCFrame * CFrame.Angles(math.rad(90), 0, 0)
 
     local SPIN_DURATION = 3
@@ -119,10 +120,6 @@ function Roulette.playRouletteAnimation(targetPlayer)
     -- Because it's tilted 90deg on X, "yaw" is now effectively the Z axis relative to local space
     local _, startYaw, _ = (initialPivot * CFrame.Angles(math.rad(-90), 0, 0)):ToEulerAnglesYXZ()
     local _, targetYaw, _ = baseLookAtCFrame:ToEulerAnglesYXZ()
-
-    -- Adjust target yaw so the tip of the hammer points to the player.
-    -- Depending on the model's import orientation, we offset by 90 degrees.
-    targetYaw = targetYaw + math.rad(-90)
 
     local yawDiff = (targetYaw - startYaw + math.pi) % (2 * math.pi) - math.pi
     local totalSpins = 5
