@@ -102,6 +102,33 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
     humanoid.UseJumpPower = false
     humanoid.JumpHeight = 60
 
+    -- VFX: Highlight & Trail Setup
+    local highlight = Instance.new("Highlight")
+    highlight.FillTransparency = 1
+    highlight.OutlineColor = Color3.new(1, 0, 0) -- Roșu
+    highlight.OutlineTransparency = 0
+    highlight.Parent = character
+
+    local attachTop = Instance.new("Attachment")
+    attachTop.Position = Vector3.new(0, 1, 0)
+    attachTop.Parent = rootPart
+
+    local attachBottom = Instance.new("Attachment")
+    attachBottom.Position = Vector3.new(0, -1, 0)
+    attachBottom.Parent = rootPart
+
+    local trail = Instance.new("Trail")
+    trail.Color = ColorSequence.new(Color3.new(1, 1, 1)) -- Alb
+    trail.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.5),
+        NumberSequenceKeypoint.new(1, 1)
+    })
+    trail.Lifetime = 0.4
+    trail.Attachment0 = attachTop
+    trail.Attachment1 = attachBottom
+    trail.Enabled = false
+    trail.Parent = rootPart
+
     -- Add a temporary force/state to disable fall damage if needed.
     -- In standard Roblox, fall damage isn't applied unless specifically scripted.
     -- We will assume standard Roblox physics.
@@ -149,6 +176,11 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
             hitboxPart:Destroy()
         end
 
+        if highlight then highlight:Destroy() end
+        if trail then trail:Destroy() end
+        if attachTop then attachTop:Destroy() end
+        if attachBottom then attachBottom:Destroy() end
+
         if humanoid then
             humanoid.UseJumpPower = false
             humanoid.JumpHeight = 7.2
@@ -164,12 +196,14 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
     table.insert(connections, humanoid.StateChanged:Connect(function(oldState, newState)
         if newState == Enum.HumanoidStateType.Freefall then
             isFalling = true
+            trail.Enabled = true
             -- Imediat ce e în aer, îi tăiem JumpHeight ca să nu poată ține Space apăsat la nesfârșit (Bunny Hop)
             humanoid.JumpHeight = 0
 
             -- NU mai anulăm pendingLandingEnd aici! Se anulează doar dacă dă hit.
             -- Dacă a aterizat, runda se va închide chiar dacă sistemul crede că a reușit să sară iar.
         elseif newState == Enum.HumanoidStateType.Landed then
+            trail.Enabled = false
             if isFalling and roundActive then
                 -- Adăugăm un mic delay înainte de a opri runda
                 -- Acest lucru permite procesarea unui atac declanșat fix înainte de a atinge solul
@@ -228,17 +262,38 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
                         hitRegistered = true
                         lastHitTick = tick()
 
-                        -- Play Random 3D Sound attached to the victim
+                        -- Ascunde victima și colectează culorile ei
+                        local victimColors = {}
+                        for _, p in ipairs(hitChar:GetDescendants()) do
+                            if p:IsA("BasePart") then
+                                table.insert(victimColors, p.Color)
+                                p.Transparency = 1
+                                p.CanCollide = false
+                                -- Oprim și eventualele decals/fețe ca să fie invizibil complet
+                                for _, d in ipairs(p:GetChildren()) do
+                                    if d:IsA("Decal") then d.Transparency = 1 end
+                                end
+                            end
+                        end
+
+                        -- Trigger VFX pe toți clienții
+                        local vfxEvent = ReplicatedStorage:FindFirstChild("VfxEvent")
                         local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
-                        if targetRoot then
+                        if targetRoot and vfxEvent then
+                            vfxEvent:FireAllClients(targetRoot.Position, victimColors)
                             playRandomHitSound(targetRoot)
                         end
 
-                        -- Bounce the attacker
-                        local bounceEvent = ReplicatedStorage:FindFirstChild("MaceBounceEvent")
-                        if bounceEvent then
-                            bounceEvent:FireClient(player)
-                        end
+                        -- Hit Pause! Înghețăm temporar atacatorul în aer pt 0.08 secunde
+                        rootPart.Anchored = true
+                        task.delay(0.08, function()
+                            rootPart.Anchored = false
+                            -- Bounce the attacker after the pause
+                            local bounceEvent = ReplicatedStorage:FindFirstChild("MaceBounceEvent")
+                            if bounceEvent then
+                                bounceEvent:FireClient(player)
+                            end
+                        end)
 
                         -- Odată ce a omorât un om în acest cadru, e de ajuns
                         break
