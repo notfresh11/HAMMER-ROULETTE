@@ -18,18 +18,20 @@ Matchmaking.getActivePlayers = getActivePlayers
 
 function Matchmaking.waitForPlayers()
     print("Matchmaking: Așteptăm minim " .. MIN_PLAYERS .. " jucători activi...")
+
+    local updateMatchmakingUIEvent = ReplicatedStorage:WaitForChild("UpdateMatchmakingUIEvent")
+
     while true do
-        if #getActivePlayers() >= MIN_PLAYERS then
+        local currentActive = #getActivePlayers()
+        updateMatchmakingUIEvent:FireAllClients("Searching for Players " .. currentActive .. "/" .. MIN_PLAYERS)
+
+        if currentActive >= MIN_PLAYERS then
             break
         end
         task.wait(1)
     end
 
     print("Matchmaking: Avem suficienți jucători. Începem în 10 secunde.")
-    local showCountdownEvent = ReplicatedStorage:WaitForChild("ShowCountdownEvent")
-    local showTextEvent = ReplicatedStorage:WaitForChild("ShowTextEvent")
-    local hideTextEvent = ReplicatedStorage:WaitForChild("HideTextEvent")
-
     local COUNTDOWN_SOUND = "rbxassetid://110001162763213"
     local START_SOUND = "rbxassetid://77736543307386"
 
@@ -41,22 +43,13 @@ function Matchmaking.waitForPlayers()
         if os.clock() - startTick >= (10 - i) then
             print(i .. "...")
 
-            -- Logică culori
-            local color = Color3.new(1, 0, 0) -- Roșu default (10 - 3)
-            if i == 2 then
-                color = Color3.new(1, 1, 0) -- Galben
-            elseif i == 1 then
-                color = Color3.new(0, 1, 0) -- Verde
-            end
-
-            showCountdownEvent:FireAllClients(i, color, COUNTDOWN_SOUND)
+            updateMatchmakingUIEvent:FireAllClients("Game starting in " .. i, COUNTDOWN_SOUND)
             i = i - 1
 
             if #getActivePlayers() < MIN_PLAYERS then
                 print("Matchmaking anulat: Număr insuficient de jucători activi.")
-                showTextEvent:FireAllClients("Matchmaking cancelled", Color3.new(1, 0, 0), "")
+                updateMatchmakingUIEvent:FireAllClients("Matchmaking Cancelled")
                 task.wait(2)
-                hideTextEvent:FireAllClients()
                 return false
             end
         end
@@ -65,9 +58,10 @@ function Matchmaking.waitForPlayers()
 
     -- Delay scurt ca să ne asigurăm că termină beep-ul pentru 1 înainte să bată Start
     task.wait(1)
-    showTextEvent:FireAllClients("The Game Has Started", Color3.new(0, 1, 0), START_SOUND)
+    updateMatchmakingUIEvent:FireAllClients("The Game Has Started", START_SOUND)
     task.delay(2, function()
-        hideTextEvent:FireAllClients()
+        -- Resetăm textul după ce începe meciul
+        updateMatchmakingUIEvent:FireAllClients("")
     end)
 
     return true
