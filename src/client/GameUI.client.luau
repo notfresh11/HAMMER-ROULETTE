@@ -54,7 +54,7 @@ end
 local TweenService = game:GetService("TweenService")
 
 -- === GUI INTERACTION LOGIC ===
-local mainUI = playerGui:WaitForChild("MAINUI", 5)
+local mainUI = playerGui:WaitForChild("MAINUI")
 if mainUI then
     -- Fix UI being pushed down by the topbar
     if mainUI:IsA("ScreenGui") then
@@ -64,18 +64,21 @@ if mainUI then
     local clickSoundId = "rbxassetid://124476359159008"
 
     -- Fetching the components based on the user's hierarchy
-    local questsGui = playerGui:WaitForChild("Quests", 5)
-    local discordGui = playerGui:WaitForChild("Discord", 5)
-    local statsGui = playerGui:WaitForChild("Stats", 5)
-    local shopGui = playerGui:WaitForChild("Shop", 5)
-    local settingsGui = playerGui:WaitForChild("Settings", 5)
+    -- Am scos limitele de timp (5 secunde) pentru a aștepta interfața oricât e nevoie.
+    local questsGui = playerGui:WaitForChild("Quests")
+    local discordGui = playerGui:WaitForChild("Discord")
+    local statsGui = playerGui:WaitForChild("Stats")
+    local shopGui = playerGui:WaitForChild("Shop")
+    local settingsGui = playerGui:WaitForChild("Settings")
 
     -- Force Enable all root ScreenGuis in case user disabled them in Studio to save space
-    if questsGui then questsGui.Enabled = true end
-    if discordGui then discordGui.Enabled = true end
-    if statsGui then statsGui.Enabled = true end
-    if shopGui then shopGui.Enabled = true end
-    if settingsGui then settingsGui.Enabled = true end
+    -- AND ensure they do not reset on spawn, so our script references don't break when players die
+    if mainUI and mainUI:IsA("ScreenGui") then mainUI.ResetOnSpawn = false end
+    if questsGui then questsGui.Enabled = true; questsGui.ResetOnSpawn = false end
+    if discordGui then discordGui.Enabled = true; discordGui.ResetOnSpawn = false end
+    if statsGui then statsGui.Enabled = true; statsGui.ResetOnSpawn = false end
+    if shopGui then shopGui.Enabled = true; shopGui.ResetOnSpawn = false end
+    if settingsGui then settingsGui.Enabled = true; settingsGui.ResetOnSpawn = false end
 
     -- AFK Component Setup
     local afkButton = mainUI:FindFirstChild("AFKButton")
