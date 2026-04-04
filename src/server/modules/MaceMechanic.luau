@@ -75,9 +75,10 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
     -- Create Permanent Hitbox Part
     local hitboxPart = Instance.new("Part")
     hitboxPart.Name = "MaceHitbox"
-    hitboxPart.Size = Vector3.new(12, 12, 12)
-    -- Position slightly in front
-    hitboxPart.CFrame = rootPart.CFrame * CFrame.new(0, 0, -3)
+    -- Make it longer downwards
+    hitboxPart.Size = Vector3.new(14, 24, 14)
+    -- Position slightly in front and further down
+    hitboxPart.CFrame = rootPart.CFrame * CFrame.new(0, -6, -2)
     hitboxPart.Anchored = false
     hitboxPart.CanCollide = false
     hitboxPart.Massless = true
@@ -162,7 +163,6 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
 
             local closestPlayer = nil
             local closestDist = math.huge
-            local bestDot = -1
 
             for _, part in ipairs(partsInBox) do
                 local hitChar = part.Parent
@@ -171,19 +171,10 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
                     if hitHumanoid.Health > 0 then
                         local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
                         if targetRoot then
-                            local dirToTarget = (targetRoot.Position - rootPart.Position).Unit
-                            local lookVector = rootPart.CFrame.LookVector
-                            -- Dot product gives 1 if looking exactly at them, -1 if behind
-                            local dot = lookVector:Dot(dirToTarget)
-
-                            -- Must be generally in front (dot > 0)
-                            if dot > 0.3 then
-                                local dist = (rootPart.Position - targetRoot.Position).Magnitude
-                                -- Prioritize closeness, but could also prioritize `dot`
-                                if dist < closestDist then
-                                    closestDist = dist
-                                    closestPlayer = hitChar
-                                end
+                            local dist = (rootPart.Position - targetRoot.Position).Magnitude
+                            if dist < closestDist then
+                                closestDist = dist
+                                closestPlayer = hitChar
                             end
                         end
                     end
