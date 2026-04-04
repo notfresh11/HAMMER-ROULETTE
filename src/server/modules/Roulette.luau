@@ -64,34 +64,43 @@ function Roulette.playRouletteAnimation(targetPlayer)
 
     -- Look for the HammerModel inside the folder
     local hammerModel = hammerSpawn:WaitForChild("HammerModel", 10)
-    if not hammerModel:IsA("Model") then
+    local isModel = hammerModel:IsA("Model")
+    local isBasePart = hammerModel:IsA("BasePart")
+
+    if not isModel and not isBasePart then
+        warn("Eroare: HammerModel nu este nici Model, nici BasePart/Union!")
         task.wait(3)
         return
     end
 
-    if not hammerModel.PrimaryPart then
-        local anyPart = hammerModel:FindFirstChildWhichIsA("BasePart", true)
-        if anyPart then
-            hammerModel.PrimaryPart = anyPart
-        else
-            warn("Eroare: HammerModel nu are niciun BasePart pentru a fi folosit ca PrimaryPart!")
-            task.wait(3)
-            return
+    if isModel then
+        if not hammerModel.PrimaryPart then
+            local anyPart = hammerModel:FindFirstChildWhichIsA("BasePart", true)
+            if anyPart then
+                hammerModel.PrimaryPart = anyPart
+            else
+                warn("Eroare: HammerModel nu are niciun BasePart pentru a fi folosit ca PrimaryPart!")
+                task.wait(3)
+                return
+            end
         end
-    end
 
-    -- Fix physics interference: ensure all parts are firmly anchored so CFrame pivoting isn't overwritten by gravity/physics engine.
-    for _, part in ipairs(hammerModel:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.Anchored = true
-            part.CanCollide = false
+        -- Fix physics interference: ensure all parts are firmly anchored
+        for _, part in ipairs(hammerModel:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Anchored = true
+                part.CanCollide = false
+            end
         end
+    elseif isBasePart then
+        hammerModel.Anchored = true
+        hammerModel.CanCollide = false
     end
 
     -- Tell the idle spinner to stop fighting us
     hammerModel:SetAttribute("IsRoulette", true)
 
-    local initialPivot = hammerModel:GetPivot()
+    local initialPivot = isModel and hammerModel:GetPivot() or hammerModel.CFrame
     local targetPos = Vector3.new(0,0,0)
 
     if targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -120,7 +129,11 @@ function Roulette.playRouletteAnimation(targetPlayer)
 
         if elapsed >= SPIN_DURATION then
             connection:Disconnect()
-            hammerModel:PivotTo(targetPivot)
+            if isModel then
+                hammerModel:PivotTo(targetPivot)
+            else
+                hammerModel.CFrame = targetPivot
+            end
             -- Allow idle spinner to resume (it won't immediately rotate visually back, it will resume smoothly from where we left it)
             hammerModel:SetAttribute("IsRoulette", false)
             return
@@ -130,7 +143,11 @@ function Roulette.playRouletteAnimation(targetPlayer)
         local finalPivot = initialPivot * CFrame.Angles(0, currentYaw, 0)
 
         -- To prevent fighting with the idle animation, we override its CFrame entirely here
-        hammerModel:PivotTo(finalPivot)
+        if isModel then
+            hammerModel:PivotTo(finalPivot)
+        else
+            hammerModel.CFrame = finalPivot
+        end
     end)
 
     task.wait(SPIN_DURATION)

@@ -23,32 +23,46 @@ local function setupMap()
         -- PREVENT VOID FALL: Anchor HammerModel exactly when the server starts
         local hammerModel = hammerSpawn:WaitForChild("HammerModel", 10)
         if hammerModel then
-            for _, part in ipairs(hammerModel:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.Anchored = true
-                    part.CanCollide = false
-                end
-            end
+            local isModel = hammerModel:IsA("Model")
 
-            -- Ensure PrimaryPart exists for rotation
-            if not hammerModel.PrimaryPart then
-                hammerModel.PrimaryPart = hammerModel:FindFirstChildWhichIsA("BasePart", true)
+            -- If it's a Model, anchor descendants. If it's just a Union/Part, anchor it directly.
+            if isModel then
+                for _, part in ipairs(hammerModel:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.Anchored = true
+                        part.CanCollide = false
+                    end
+                end
+                if not hammerModel.PrimaryPart then
+                    hammerModel.PrimaryPart = hammerModel:FindFirstChildWhichIsA("BasePart", true)
+                end
+            elseif hammerModel:IsA("BasePart") then
+                hammerModel.Anchored = true
+                hammerModel.CanCollide = false
             end
 
             -- Teleport the visual hammer precisely above the blue block
             local spawnBlock = hammerSpawn:WaitForChild("HammerSpawn", 5)
-            if spawnBlock and spawnBlock:IsA("BasePart") and hammerModel.PrimaryPart then
+            if spawnBlock and spawnBlock:IsA("BasePart") then
                 local targetCFrame = spawnBlock.CFrame * CFrame.new(0, 3, 0)
-                hammerModel:PivotTo(targetCFrame)
+                if isModel and hammerModel.PrimaryPart then
+                    hammerModel:PivotTo(targetCFrame)
+                elseif hammerModel:IsA("BasePart") then
+                    hammerModel.CFrame = targetCFrame
+                end
             end
 
             -- Continuous Idle Spin
             RunService.Heartbeat:Connect(function(dt)
-                if hammerModel and hammerModel.Parent and hammerModel.PrimaryPart then
-                    -- Stop idle spin when the active roulette animation takes over
+                if hammerModel and hammerModel.Parent then
                     if not hammerModel:GetAttribute("IsRoulette") then
-                        local currentPivot = hammerModel:GetPivot()
-                        hammerModel:PivotTo(currentPivot * CFrame.Angles(0, math.rad(90 * dt), 0))
+                        if isModel and hammerModel.PrimaryPart then
+                            local currentPivot = hammerModel:GetPivot()
+                            hammerModel:PivotTo(currentPivot * CFrame.Angles(0, math.rad(90 * dt), 0))
+                        elseif hammerModel:IsA("BasePart") then
+                            local currentCFrame = hammerModel.CFrame
+                            hammerModel.CFrame = currentCFrame * CFrame.Angles(0, math.rad(90 * dt), 0)
+                        end
                     end
                 end
             end)
