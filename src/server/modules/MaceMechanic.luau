@@ -258,10 +258,15 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
                         -- KILL!
 
                         -- Prevent the default Roblox "Oof" / death sound from playing
+                        -- Roblox client audio replication sometimes caches the sound before Destroy propagates.
+                        -- Setting Volume = 0 and overriding the ID prevents it entirely.
                         local victimRoot = hitChar:FindFirstChild("HumanoidRootPart")
                         if victimRoot then
                             local defaultDeathSound = victimRoot:FindFirstChild("Died")
                             if defaultDeathSound and defaultDeathSound:IsA("Sound") then
+                                defaultDeathSound.Volume = 0
+                                defaultDeathSound.SoundId = ""
+                                defaultDeathSound:Stop()
                                 defaultDeathSound:Destroy()
                             end
                         end

@@ -13,10 +13,11 @@ screenGui.Parent = playerGui
 local textLabel = Instance.new("TextLabel")
 textLabel.Name = "CenterText"
 textLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-textLabel.Size = UDim2.new(1, 0, 0.35, 0) -- Mărit pe Y pentru text mai mare
+textLabel.Size = UDim2.new(1, 0, 0.15, 0) -- Făcut textul mai mic conform cerinței (de la 0.35 la 0.15)
 textLabel.Position = UDim2.new(0.5, 0, 0.5, 0) -- Exact pe centrul ecranului
 textLabel.BackgroundTransparency = 1
-textLabel.FontFace = Font.new("rbxassetid://12187371840")
+-- Schimbat pe fontul FredokaOne dorit de utilizator
+textLabel.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json")
 textLabel.TextScaled = true
 textLabel.TextColor3 = Color3.new(1, 1, 1) -- Alb default
 textLabel.TextStrokeTransparency = 0 -- Contur negru
@@ -191,6 +192,17 @@ if mainUI then
     -- Ascunde toate meniurile automat cand intri pe joc pentru a nu te bombarda pe ecran
     hideAllMenus()
 
+    local toggleMainUiEvent = ReplicatedStorage:WaitForChild("ToggleMainUIEvent", 10)
+    -- Când intrăm în meci, pe lângă ascunderea MAINUI, închidem forțat și orice meniu rămas deschis (cum ar fi Quests)
+    if toggleMainUiEvent then
+        toggleMainUiEvent.OnClientEvent:Connect(function(isVisible)
+            mainUI.Enabled = isVisible
+            if not isVisible then
+                hideAllMenus()
+            end
+        end)
+    end
+
     -- Assign logic to buttons
     local cornerButtonsFolder = mainUI:FindFirstChild("CornerButtons")
 
@@ -288,13 +300,6 @@ local showCountdown = ReplicatedStorage:WaitForChild("ShowCountdownEvent", 10)
 local showText = ReplicatedStorage:WaitForChild("ShowTextEvent", 10)
 local hideText = ReplicatedStorage:WaitForChild("HideTextEvent", 10)
 local vfxEvent = ReplicatedStorage:WaitForChild("VfxEvent", 10)
-local toggleMainUiEvent = ReplicatedStorage:WaitForChild("ToggleMainUIEvent", 10)
-
-if toggleMainUiEvent and mainUI then
-    toggleMainUiEvent.OnClientEvent:Connect(function(isVisible)
-        mainUI.Enabled = isVisible
-    end)
-end
 
 -- Funcție Helper VFX Client
 local function runClientVfx(victimPos, victimColors)
