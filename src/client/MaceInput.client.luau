@@ -17,16 +17,10 @@ if bounceEvent then
             local rootPart = character:FindFirstChild("HumanoidRootPart")
             local humanoid = character:FindFirstChild("Humanoid")
             if rootPart and humanoid then
-                -- Oprim orice viteză descendentă (pentru a asigura că bounce-ul nu e anulat de gravitație/viteza de cădere)
-                rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-
-                -- Setăm starea humanoid-ului pentru siguranță
+                -- Setăm o viteză mare și resetăm starea humanoid-ului ca să nu o blocheze
                 humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-
-                -- Aplicăm impuls fizic masiv bazat pe greutatea personajului
-                -- 200 de unități de forță per unitate de masă aruncă un caracter masiv în aer instant
-                rootPart:ApplyImpulse(Vector3.new(0, rootPart.AssemblyMass * 200, 0))
-                print("MaceInput: S-a aplicat un impuls masiv de bounce!")
+                rootPart.AssemblyLinearVelocity = Vector3.new(0, 100, 0)
+                print("MaceInput: Viteza Y a fost setată la 100!")
             end
         end
     end)
