@@ -29,6 +29,7 @@ end
 local Matchmaking = require(script.Parent.modules.Matchmaking)
 local Roulette = require(script.Parent.modules.Roulette)
 local MaceMechanic = require(script.Parent.modules.MaceMechanic)
+local MapManager = require(script.Parent.modules.MapManager)
 
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
@@ -46,115 +47,65 @@ local function setPlayersAnchored(playersList, isAnchored)
 end
 
 -- Helper function to toggle the visual hammer
-local function setHammerVisibility(visible)
-    local hammerSpawn = Workspace:FindFirstChild("HammerSpawn")
-    if hammerSpawn then
-        local hammerModel = hammerSpawn:FindFirstChild("HammerModel")
-        if hammerModel then
-            local transparency = visible and 0 or 1
-            if hammerModel:IsA("Model") then
-                for _, part in ipairs(hammerModel:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.Transparency = transparency
-                    end
+local function setHammerVisibility(hammerModel, visible)
+    if hammerModel then
+        local transparency = visible and 0 or 1
+        if hammerModel:IsA("Model") then
+            for _, part in ipairs(hammerModel:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Transparency = transparency
                 end
-            elseif hammerModel:IsA("BasePart") then
-                hammerModel.Transparency = transparency
             end
+        elseif hammerModel:IsA("BasePart") then
+            hammerModel.Transparency = transparency
         end
     end
 end
 
 -- Function to initialize map elements (make spawns invisible)
 local function setupMap()
-    local spawns = Workspace:WaitForChild("PlayerSpawn", 10)
-    if spawns then
-        for _, part in ipairs(spawns:GetChildren()) do
-            if part:IsA("BasePart") then
-                part.Transparency = 1
-                part.Anchored = true
-                part.CanCollide = false
-            end
-        end
-    end
-
-    local hammerSpawn = Workspace:WaitForChild("HammerSpawn", 10)
-    if hammerSpawn then
-        -- PREVENT VOID FALL: Anchor HammerModel exactly when the server starts
-        local hammerModel = hammerSpawn:WaitForChild("HammerModel", 10)
-        if hammerModel then
-            local isModel = hammerModel:IsA("Model")
-
-            -- If it's a Model, anchor descendants. If it's just a Union/Part, anchor it directly.
-            if isModel then
-                for _, part in ipairs(hammerModel:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.Anchored = true
-                        part.CanCollide = false
-                    end
-                end
-                if not hammerModel.PrimaryPart then
-                    hammerModel.PrimaryPart = hammerModel:FindFirstChildWhichIsA("BasePart", true)
-                end
-            elseif hammerModel:IsA("BasePart") then
-                hammerModel.Anchored = true
-                hammerModel.CanCollide = false
-            end
-
-            -- Teleport the visual hammer precisely above the blue block
-            local spawnBlock = hammerSpawn:WaitForChild("HammerSpawn", 5)
-            if spawnBlock and spawnBlock:IsA("BasePart") then
-                -- Make the spawn block invisible
-                spawnBlock.Transparency = 1
-
-                -- Calculate exact height so the hammer rests on the floor
-                local hammerHeight = 1
-                if isModel and hammerModel.PrimaryPart then
-                    -- If laying flat, the 'height' is roughly its Z or X size depending on orientation, but we assume a small offset
-                    hammerHeight = hammerModel.PrimaryPart.Size.Z / 2
-                elseif hammerModel:IsA("BasePart") then
-                    hammerHeight = hammerModel.Size.Z / 2
-                end
-
-                -- Lay it flat on the ground (rotate 90 degrees on X) and place it right on top of the block
-                local yOffset = (spawnBlock.Size.Y / 2) + hammerHeight
-                local targetCFrame = spawnBlock.CFrame * CFrame.new(0, yOffset, 0) * CFrame.Angles(math.rad(90), 0, 0)
-
-                if isModel and hammerModel.PrimaryPart then
-                    hammerModel:PivotTo(targetCFrame)
-                elseif hammerModel:IsA("BasePart") then
-                    hammerModel.CFrame = targetCFrame
-                end
-            end
-
-            -- Continuous Idle Spin
-            RunService.Heartbeat:Connect(function(dt)
-                if hammerModel and hammerModel.Parent then
-                    if not hammerModel:GetAttribute("IsRoulette") then
-                        -- To spin a flat object like a compass needle, we rotate around its local Z axis (which is now pointing "up" globally due to the 90deg X rotation)
-                        if isModel and hammerModel.PrimaryPart then
-                            local currentPivot = hammerModel:GetPivot()
-                            hammerModel:PivotTo(currentPivot * CFrame.Angles(0, 0, math.rad(90 * dt)))
-                        elseif hammerModel:IsA("BasePart") then
-                            local currentCFrame = hammerModel.CFrame
-                            hammerModel.CFrame = currentCFrame * CFrame.Angles(0, 0, math.rad(90 * dt))
-                        end
-                    end
-                end
-            end)
-        end
-    end
+    MapManager.hideAllMaps()
 end
+
+-- Spinner Connection for active hammer
+local currentSpinnerConnection = nil
 
 -- Main Game Loop
 local function gameLoop()
     local Players = game:GetService("Players")
 
     while true do
-        print("MainLoop: Așteptăm jucători pentru un NOU MECI...")
-        local success = Matchmaking.waitForPlayers()
+        -- 1. ALEGEREA ȘI SPAWNAREA HĂRȚII
+        print("MainLoop: Pregătim o nouă hartă...")
+        local currentMap, currentHammer = MapManager.chooseAndSpawnMap()
 
-        if success then
+        -- Dacă nu e nicio hartă validă, așteptăm un pic și reîncercăm
+        if not currentMap then
+            warn("Nu s-a putut alege harta. Se va reîncerca în scurt timp...")
+            task.wait(3)
+        else
+            -- Repornește animația de idle a ciocanului pe noul ciocan
+            if currentSpinnerConnection then currentSpinnerConnection:Disconnect() end
+            if currentHammer then
+                currentSpinnerConnection = RunService.Heartbeat:Connect(function(dt)
+                    if currentHammer and currentHammer.Parent then
+                        if not currentHammer:GetAttribute("IsRoulette") then
+                            if currentHammer:IsA("Model") and currentHammer.PrimaryPart then
+                                local currentPivot = currentHammer:GetPivot()
+                                currentHammer:PivotTo(currentPivot * CFrame.Angles(0, 0, math.rad(90 * dt)))
+                            elseif currentHammer:IsA("BasePart") then
+                                local currentCFrame = currentHammer.CFrame
+                                currentHammer.CFrame = currentCFrame * CFrame.Angles(0, 0, math.rad(90 * dt))
+                            end
+                        end
+                    end
+                end)
+            end
+
+            print("MainLoop: Harta a fost spawnată. Așteptăm jucători pentru un NOU MECI...")
+            local success = Matchmaking.waitForPlayers()
+
+            if success then
             -- Așteptăm cele 2 secunde cât timp este afișat mesajul "The Game Has Started"
             task.wait(2)
 
@@ -176,9 +127,9 @@ local function gameLoop()
                 print("MainLoop: Începem o NOUĂ RUNDĂ cu " .. #activePlayers .. " supraviețuitori.")
 
                 -- Ensure hammer is visible at round start
-                setHammerVisibility(true)
+                setHammerVisibility(currentHammer, true)
 
-                Matchmaking.teleportPlayersToSpawns(activePlayers)
+                Matchmaking.teleportPlayersToSpawns(activePlayers, currentMap)
 
                 -- Block player movement while roulette spins
                 setPlayersAnchored(activePlayers, true)
@@ -187,13 +138,13 @@ local function gameLoop()
 
                 local chosenPlayer = Roulette.selectMaceBearer(activePlayers)
                 if chosenPlayer then
-                    Roulette.playRouletteAnimation(chosenPlayer)
+                    Roulette.playRouletteAnimation(chosenPlayer, currentHammer)
 
                     -- Unblock movement now that roulette has finished
                     setPlayersAnchored(activePlayers, false)
 
                     -- Hide visual hammer because the player picked it up
-                    setHammerVisibility(false)
+                    setHammerVisibility(currentHammer, false)
 
                     local roundEnded = false
                     local victimDied = false
@@ -244,51 +195,52 @@ local function gameLoop()
                 end
             end -- End of Round Loop
 
-            if disconnectConnection then
-                disconnectConnection:Disconnect()
-            end
+                if disconnectConnection then
+                    disconnectConnection:Disconnect()
+                end
 
-            -- Force cleanup of the mechanic in case a round ended abruptly (e.g. opponent died, leaving only the attacker)
-            if MaceMechanic.forceStopMechanic then
-                MaceMechanic.forceStopMechanic()
-            end
+                -- Force cleanup of the mechanic in case a round ended abruptly (e.g. opponent died, leaving only the attacker)
+                if MaceMechanic.forceStopMechanic then
+                    MaceMechanic.forceStopMechanic()
+                end
 
-            -- Dacă bucla de runde s-a terminat, înseamnă că meciul s-a încheiat (avem <= 1 supraviețuitori)
-            if #activePlayers == 1 then
-                local winner = activePlayers[1]
-                print("MainLoop: MECIUL S-A TERMINAT! Câștigătorul este: " .. winner.Name)
+                -- Dacă bucla de runde s-a terminat, înseamnă că meciul s-a încheiat (avem <= 1 supraviețuitori)
+                if #activePlayers == 1 then
+                    local winner = activePlayers[1]
+                    print("MainLoop: MECIUL S-A TERMINAT! Câștigătorul este: " .. winner.Name)
 
-                -- Teleport winner to a default roblox spawn location
-                if winner.Character and winner.Character:FindFirstChild("HumanoidRootPart") then
-                    local rootPart = winner.Character.HumanoidRootPart
-                    local spawns = {}
+                    -- Teleport winner to a default roblox spawn location
+                    if winner.Character and winner.Character:FindFirstChild("HumanoidRootPart") then
+                        local rootPart = winner.Character.HumanoidRootPart
+                        local spawns = {}
 
-                    -- Search for any SpawnLocation in Workspace
-                    for _, obj in ipairs(Workspace:GetDescendants()) do
-                        if obj:IsA("SpawnLocation") then
-                            table.insert(spawns, obj)
+                        -- Search for any SpawnLocation in Workspace
+                        for _, obj in ipairs(Workspace:GetDescendants()) do
+                            if obj:IsA("SpawnLocation") then
+                                table.insert(spawns, obj)
+                            end
+                        end
+
+                        if #spawns > 0 then
+                            -- Pick a random spawn point to teleport the winner
+                            local chosenSpawn = spawns[math.random(1, #spawns)]
+                            -- Y offset is half the spawn height + half character height roughly, 5 is a safe amount
+                            rootPart.CFrame = chosenSpawn.CFrame * CFrame.new(0, chosenSpawn.Size.Y/2 + 3, 0)
+                            print("MainLoop: Câștigătorul a fost teleportat la spawn.")
+                        else
+                            -- Fallback just in case no default spawn exists
+                            rootPart.CFrame = CFrame.new(0, 50, 0)
+                            warn("MainLoop: Nu s-a găsit niciun SpawnLocation în Workspace. S-a folosit coordonata de fallback.")
                         end
                     end
-
-                    if #spawns > 0 then
-                        -- Pick a random spawn point to teleport the winner
-                        local chosenSpawn = spawns[math.random(1, #spawns)]
-                        -- Y offset is half the spawn height + half character height roughly, 5 is a safe amount
-                        rootPart.CFrame = chosenSpawn.CFrame * CFrame.new(0, chosenSpawn.Size.Y/2 + 3, 0)
-                        print("MainLoop: Câștigătorul a fost teleportat la spawn.")
-                    else
-                        -- Fallback just in case no default spawn exists
-                        rootPart.CFrame = CFrame.new(0, 50, 0)
-                        warn("MainLoop: Nu s-a găsit niciun SpawnLocation în Workspace. S-a folosit coordonata de fallback.")
-                    end
+                else
+                    print("MainLoop: MECIUL S-A TERMINAT! Nu există niciun câștigător valid.")
                 end
+                task.wait(5) -- Timp înainte de a porni un nou meci global
             else
-                print("MainLoop: MECIUL S-A TERMINAT! Nu există niciun câștigător valid.")
+                -- Not enough players during countdown, loop will restart
+                task.wait(2)
             end
-            task.wait(5) -- Timp înainte de a porni un nou meci global
-        else
-            -- Not enough players during countdown, loop will restart
-            task.wait(2)
         end
     end
 end

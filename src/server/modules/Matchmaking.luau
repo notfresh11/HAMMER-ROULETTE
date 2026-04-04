@@ -62,20 +62,23 @@ function Matchmaking.waitForPlayers()
     return true
 end
 
-function Matchmaking.teleportPlayersToSpawns(activePlayers)
+function Matchmaking.teleportPlayersToSpawns(activePlayers, currentMapInstance)
     print("Matchmaking: Teleportăm jucătorii supraviețuitori...")
-    -- Use the exact folder name from the screenshot: "PlayerSpawn"
-    local spawnFolder = Workspace:WaitForChild("PlayerSpawn", 10)
     local spawns = {}
 
-    if spawnFolder then
-        for _, part in ipairs(spawnFolder:GetChildren()) do
-            if part:IsA("BasePart") then
-                table.insert(spawns, part)
+    if currentMapInstance then
+        local spawnFolder = currentMapInstance:FindFirstChild("PlayerSpawn")
+        if spawnFolder then
+            for _, part in ipairs(spawnFolder:GetChildren()) do
+                if part:IsA("BasePart") then
+                    table.insert(spawns, part)
+                end
             end
+        else
+            warn("Eroare: Nu am găsit folderul PlayerSpawn în harta " .. currentMapInstance.Name)
         end
     else
-        warn("Eroare: Nu am găsit folderul PlayerSpawn în Workspace!")
+        warn("Eroare: Nu a fost pasată nicio hartă curentă pentru teleportare!")
     end
 
     for index, player in ipairs(activePlayers) do
