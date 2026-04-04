@@ -51,6 +51,110 @@ end
 local showCountdown = ReplicatedStorage:WaitForChild("ShowCountdownEvent", 10)
 local showText = ReplicatedStorage:WaitForChild("ShowTextEvent", 10)
 local hideText = ReplicatedStorage:WaitForChild("HideTextEvent", 10)
+local vfxEvent = ReplicatedStorage:WaitForChild("VfxEvent", 10)
+
+-- Funcție Helper VFX Client
+local function runClientVfx(victimPos, victimColors)
+    local Workspace = game:GetService("Workspace")
+    local TweenService = game:GetService("TweenService")
+    local Debris = game:GetService("Debris")
+
+    -- 1. Explozia de cuburi a victimei
+    for _, partColor in ipairs(victimColors) do
+        local shard = Instance.new("Part")
+        shard.Size = Vector3.new(1, 1, 1)
+        shard.Color = partColor
+        shard.Material = Enum.Material.SmoothPlastic
+        shard.Position = victimPos + Vector3.new(math.random(-1,1), math.random(1,4), math.random(-1,1))
+        shard.CanCollide = false
+        shard.Parent = Workspace
+
+        -- Dăm o forță explozivă (Client side physics)
+        local spread = Vector3.new(math.random(-50,50), math.random(50, 100), math.random(-50,50))
+        shard.AssemblyLinearVelocity = spread
+
+        -- Le micșorăm și le distrugem
+        local tween = TweenService:Create(shard, TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = Vector3.new(0,0,0)})
+        tween:Play()
+        Debris:AddItem(shard, 2)
+    end
+
+    -- 2. Ground Smash (Crater Ring)
+    for i = 1, 8 do
+        local angle = (math.pi * 2 / 8) * i
+        local offset = Vector3.new(math.cos(angle) * 4, -2, math.sin(angle) * 4)
+
+        local rock = Instance.new("Part")
+        rock.Size = Vector3.new(2, 2, 2)
+        rock.Color = Color3.fromRGB(100, 100, 100)
+        rock.Material = Enum.Material.Slate
+        rock.Position = victimPos + offset
+        rock.Anchored = true
+        rock.CanCollide = false
+        rock.Parent = Workspace
+
+        -- Ridicăm pietrele din pământ și le rotim random
+        local upCFrame = CFrame.new(victimPos + offset + Vector3.new(0, 3, 0)) * CFrame.Angles(math.random(), math.random(), math.random())
+        local rockTween = TweenService:Create(rock, TweenInfo.new(0.3, Enum.EasingStyle.Bounce), {CFrame = upCFrame})
+        rockTween:Play()
+
+        -- Se scufundă la loc și dispar
+        task.delay(1.5, function()
+            local downTween = TweenService:Create(rock, TweenInfo.new(0.5), {Position = rock.Position - Vector3.new(0,5,0), Transparency = 1})
+            downTween:Play()
+        end)
+        Debris:AddItem(rock, 2.5)
+    end
+
+    -- 3. Shockwave (Inel invizibil care se lărgește)
+    local shock = Instance.new("Part")
+    shock.Shape = Enum.PartType.Cylinder
+    shock.Size = Vector3.new(0.5, 2, 2) -- Orientare X, Y, Z (pentru disc plat punem Y mare pe lateral, apoi îl rotim)
+    shock.CFrame = CFrame.new(victimPos) * CFrame.Angles(0, 0, math.rad(90))
+    shock.Color = Color3.new(1,1,1)
+    shock.Material = Enum.Material.Neon
+    shock.Transparency = 0.5
+    shock.Anchored = true
+    shock.CanCollide = false
+    shock.Parent = Workspace
+
+    local shockTween = TweenService:Create(shock, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = Vector3.new(0.1, 30, 30),
+        Transparency = 1
+    })
+    shockTween:Play()
+    Debris:AddItem(shock, 0.5)
+
+    -- 4. Screen Shake
+    local camera = Workspace.CurrentCamera
+    local distToImpact = (camera.CFrame.Position - victimPos).Magnitude
+    if distToImpact < 100 then
+        -- Intensitatea scade cu distanța (max 1 la 0 distanță, 0 la 100 distanță)
+        local intensity = 1 - (distToImpact / 100)
+        task.spawn(function()
+            local startTime = tick()
+            local duration = 0.3
+            while tick() - startTime < duration do
+                local elapsed = tick() - startTime
+                local falloff = 1 - (elapsed / duration)
+                local offset = Vector3.new(
+                    math.random(-100, 100)/100,
+                    math.random(-100, 100)/100,
+                    math.random(-100, 100)/100
+                ) * intensity * falloff * 2 -- Multiplicator general
+
+                camera.CFrame = camera.CFrame * CFrame.new(offset)
+                task.wait()
+            end
+        end)
+    end
+end
+
+if vfxEvent then
+    vfxEvent.OnClientEvent:Connect(function(victimPos, victimColors)
+        runClientVfx(victimPos, victimColors)
+    end)
+end
 
 if showCountdown then
     showCountdown.OnClientEvent:Connect(function(numberText, colorCode, soundId)

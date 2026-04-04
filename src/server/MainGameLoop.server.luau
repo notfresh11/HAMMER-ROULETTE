@@ -16,7 +16,8 @@ if not ReplicatedStorage:FindFirstChild(maceBounceEventName) then
 end
 
 -- UI Events
-local uiEvents = {"ShowCountdownEvent", "ShowTextEvent", "HideTextEvent"}
+-- UI Events and VFX
+local uiEvents = {"ShowCountdownEvent", "ShowTextEvent", "HideTextEvent", "VfxEvent"}
 for _, evName in ipairs(uiEvents) do
     if not ReplicatedStorage:FindFirstChild(evName) then
         local ev = Instance.new("RemoteEvent")
