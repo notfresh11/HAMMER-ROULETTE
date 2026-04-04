@@ -5,10 +5,21 @@ local Workspace = game:GetService("Workspace")
 local MIN_PLAYERS = 2
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local function getActivePlayers()
+    local activePlayers = {}
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if not plr:GetAttribute("IsAFK") then
+            table.insert(activePlayers, plr)
+        end
+    end
+    return activePlayers
+end
+Matchmaking.getActivePlayers = getActivePlayers
+
 function Matchmaking.waitForPlayers()
-    print("Matchmaking: Așteptăm minim " .. MIN_PLAYERS .. " jucători...")
+    print("Matchmaking: Așteptăm minim " .. MIN_PLAYERS .. " jucători activi...")
     while true do
-        if #Players:GetPlayers() >= MIN_PLAYERS then
+        if #getActivePlayers() >= MIN_PLAYERS then
             break
         end
         task.wait(1)
@@ -41,8 +52,8 @@ function Matchmaking.waitForPlayers()
             showCountdownEvent:FireAllClients(i, color, COUNTDOWN_SOUND)
             i = i - 1
 
-            if #Players:GetPlayers() < MIN_PLAYERS then
-                print("Matchmaking anulat: Număr insuficient de jucători.")
+            if #getActivePlayers() < MIN_PLAYERS then
+                print("Matchmaking anulat: Număr insuficient de jucători activi.")
                 showTextEvent:FireAllClients("Matchmaking cancelled", Color3.new(1, 0, 0), "")
                 task.wait(2)
                 hideTextEvent:FireAllClients()

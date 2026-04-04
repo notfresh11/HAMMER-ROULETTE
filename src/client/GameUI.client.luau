@@ -47,6 +47,145 @@ local function playSoundIsolated(soundId)
     newSound:Play()
 end
 
+local TweenService = game:GetService("TweenService")
+
+-- === GUI INTERACTION LOGIC ===
+local mainUI = playerGui:WaitForChild("MAINUI", 5)
+if mainUI then
+    local clickSoundId = "rbxassetid://124476359159008"
+
+    -- Fetching the components based on the user's hierarchy
+    local questsGui = playerGui:WaitForChild("Quests", 5)
+    local discordGui = playerGui:WaitForChild("Discord", 5)
+    local statsGui = playerGui:WaitForChild("Stats", 5)
+    local shopGui = playerGui:WaitForChild("Shop", 5)
+    local settingsGui = playerGui:WaitForChild("Settings", 5)
+
+    -- AFK Component Setup
+    local afkButton = mainUI:FindFirstChild("AFKButton")
+    local isAFK = false
+    local afkTextFadeTween = nil
+    local afkDelayThread = nil
+
+    -- Use WaitForChild instead of creating a fake local instance
+    local toggleAfkEvent = ReplicatedStorage:WaitForChild("ToggleAFKEvent")
+
+    if afkButton then
+        local yesAfkImg = afkButton:FindFirstChild("YesAFK")
+        local noAfkImg = afkButton:FindFirstChild("NoAFK")
+        local afkTextLabel = afkButton:FindFirstChild("TextLabel")
+
+        -- Setup default state
+        if yesAfkImg then yesAfkImg.Visible = false end
+        if noAfkImg then noAfkImg.Visible = true end
+        if afkTextLabel then
+            afkTextLabel.TextTransparency = 1
+            afkTextLabel.TextStrokeTransparency = 1
+        end
+
+        afkButton.MouseButton1Click:Connect(function()
+            playSoundIsolated(clickSoundId)
+            isAFK = not isAFK
+
+            -- Update Images
+            if yesAfkImg then yesAfkImg.Visible = isAFK end
+            if noAfkImg then noAfkImg.Visible = not isAFK end
+
+            -- Inform Server
+            toggleAfkEvent:FireServer(isAFK)
+
+            -- Update Text
+            if afkTextLabel then
+                -- Reset existing tween and thread if any
+                if afkTextFadeTween then
+                    afkTextFadeTween:Cancel()
+                end
+                if afkDelayThread then
+                    task.cancel(afkDelayThread)
+                    afkDelayThread = nil
+                end
+
+                afkTextLabel.TextTransparency = 0
+                afkTextLabel.TextStrokeTransparency = 0
+
+                if isAFK then
+                    afkTextLabel.Text = "You are AFK"
+                    afkTextLabel.TextColor3 = Color3.new(1, 0, 0) -- Red
+                else
+                    afkTextLabel.Text = "You are not AFK"
+                    afkTextLabel.TextColor3 = Color3.new(0, 1, 0) -- Green
+                end
+
+                -- Create fade out tween after a short delay
+                afkDelayThread = task.delay(1.5, function()
+                    local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+                    afkTextFadeTween = TweenService:Create(afkTextLabel, tweenInfo, {
+                        TextTransparency = 1,
+                        TextStrokeTransparency = 1
+                    })
+                    afkTextFadeTween:Play()
+                end)
+            end
+        end)
+    end
+
+    -- Menu Toggling Logic
+    local menus = {
+        ShopButton = shopGui and shopGui:FindFirstChild("MainFrame"),
+        QuestsButton = questsGui and questsGui:FindFirstChild("MainFrame"),
+        StatsButton = statsGui and statsGui:FindFirstChild("MainFrame"),
+        SettingsButton = settingsGui and settingsGui:FindFirstChild("MainFrame"),
+        DiscordButton = discordGui and discordGui:FindFirstChild("MainFrame")
+    }
+
+    local function hideAllMenus()
+        for _, frame in pairs(menus) do
+            if frame then
+                frame.Visible = false
+            end
+        end
+    end
+
+    -- Assign logic to buttons
+    for buttonName, targetFrame in pairs(menus) do
+        local button = mainUI:FindFirstChild(buttonName)
+        if button then
+            button.MouseButton1Click:Connect(function()
+                playSoundIsolated(clickSoundId)
+
+                -- Toggle logic: if already open, just close it
+                local wasVisible = targetFrame and targetFrame.Visible
+                hideAllMenus()
+
+                if targetFrame and not wasVisible then
+                    targetFrame.Visible = true
+                end
+            end)
+        end
+    end
+
+    -- Hover Animations for all text/image buttons in MAINUI
+    for _, child in ipairs(mainUI:GetChildren()) do
+        if child:IsA("GuiButton") then
+            local originalSize = child.Size
+            local targetSize = UDim2.new(
+                originalSize.X.Scale * 1.1, originalSize.X.Offset * 1.1,
+                originalSize.Y.Scale * 1.1, originalSize.Y.Offset * 1.1
+            )
+
+            child.MouseEnter:Connect(function()
+                local tween = TweenService:Create(child, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize})
+                tween:Play()
+            end)
+
+            child.MouseLeave:Connect(function()
+                local tween = TweenService:Create(child, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = originalSize})
+                tween:Play()
+            end)
+        end
+    end
+end
+
 -- Remote Events
 local showCountdown = ReplicatedStorage:WaitForChild("ShowCountdownEvent", 10)
 local showText = ReplicatedStorage:WaitForChild("ShowTextEvent", 10)

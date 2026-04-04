@@ -17,7 +17,7 @@ end
 
 -- UI Events
 -- UI Events and VFX
-local uiEvents = {"ShowCountdownEvent", "ShowTextEvent", "HideTextEvent", "VfxEvent"}
+local uiEvents = {"ShowCountdownEvent", "ShowTextEvent", "HideTextEvent", "VfxEvent", "ToggleAFKEvent"}
 for _, evName in ipairs(uiEvents) do
     if not ReplicatedStorage:FindFirstChild(evName) then
         local ev = Instance.new("RemoteEvent")
@@ -25,6 +25,13 @@ for _, evName in ipairs(uiEvents) do
         ev.Parent = ReplicatedStorage
     end
 end
+
+local toggleAfkEvent = ReplicatedStorage:WaitForChild("ToggleAFKEvent")
+toggleAfkEvent.OnServerEvent:Connect(function(player, isAFK)
+    if typeof(isAFK) == "boolean" then
+        player:SetAttribute("IsAFK", isAFK)
+    end
+end)
 
 local Matchmaking = require(script.Parent.modules.Matchmaking)
 local Roulette = require(script.Parent.modules.Roulette)
@@ -110,7 +117,7 @@ local function gameLoop()
             task.wait(2)
 
             -- Meciul începe, înregistrăm toți jucătorii care participă la acest meci
-            local activePlayers = Players:GetPlayers()
+            local activePlayers = Matchmaking.getActivePlayers()
             print("MainLoop: Meciul a început cu " .. #activePlayers .. " jucători!")
 
             -- Handle disconnects during the match to prevent softlocking
