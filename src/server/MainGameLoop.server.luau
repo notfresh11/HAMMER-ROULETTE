@@ -103,8 +103,22 @@ local function setupMap()
             -- Teleport the visual hammer precisely above the blue block
             local spawnBlock = hammerSpawn:WaitForChild("HammerSpawn", 5)
             if spawnBlock and spawnBlock:IsA("BasePart") then
-                -- Lay it flat on the ground (rotate 90 degrees on X)
-                local targetCFrame = spawnBlock.CFrame * CFrame.new(0, 2, 0) * CFrame.Angles(math.rad(90), 0, 0)
+                -- Make the spawn block invisible
+                spawnBlock.Transparency = 1
+
+                -- Calculate exact height so the hammer rests on the floor
+                local hammerHeight = 1
+                if isModel and hammerModel.PrimaryPart then
+                    -- If laying flat, the 'height' is roughly its Z or X size depending on orientation, but we assume a small offset
+                    hammerHeight = hammerModel.PrimaryPart.Size.Z / 2
+                elseif hammerModel:IsA("BasePart") then
+                    hammerHeight = hammerModel.Size.Z / 2
+                end
+
+                -- Lay it flat on the ground (rotate 90 degrees on X) and place it right on top of the block
+                local yOffset = (spawnBlock.Size.Y / 2) + hammerHeight
+                local targetCFrame = spawnBlock.CFrame * CFrame.new(0, yOffset, 0) * CFrame.Angles(math.rad(90), 0, 0)
+
                 if isModel and hammerModel.PrimaryPart then
                     hammerModel:PivotTo(targetCFrame)
                 elseif hammerModel:IsA("BasePart") then

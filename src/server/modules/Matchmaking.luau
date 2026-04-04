@@ -74,16 +74,26 @@ function Matchmaking.teleportPlayersToSpawns(activePlayers)
         if player and player.Parent == Players then
             local character = player.Character
             if character and character:FindFirstChild("HumanoidRootPart") then
-                local spawnPos = Vector3.new(0, 50, 0) -- fallback
+                local rootPart = character.HumanoidRootPart
+                local targetCFrame = CFrame.new(0, 50, 0) -- fallback
+
                 if #spawns > 0 then
                     -- Round robin assign spawns
                     local spawnIndex = ((index - 1) % #spawns) + 1
-                    spawnPos = spawns[spawnIndex].Position + Vector3.new(0, 5, 0)
+                    local chosenSpawn = spawns[spawnIndex]
+
+                    -- Calculate exact floor placement
+                    -- Y offset = (Spawn Height / 2) + (RootPart Height / 2) + Humanoid HipHeight (which is usually around 2 studs for R15)
+                    local humanoid = character:FindFirstChild("Humanoid")
+                    local hipHeight = humanoid and humanoid.HipHeight or 2
+                    local yOffset = (chosenSpawn.Size.Y / 2) + (rootPart.Size.Y / 2) + hipHeight
+
+                    targetCFrame = CFrame.new(chosenSpawn.Position + Vector3.new(0, yOffset, 0))
                 else
-                    spawnPos = Vector3.new((index - 1) * 5, 50, 0)
+                    targetCFrame = CFrame.new((index - 1) * 5, 50, 0)
                 end
 
-                character.HumanoidRootPart.CFrame = CFrame.new(spawnPos)
+                rootPart.CFrame = targetCFrame
             end
         end
     end
