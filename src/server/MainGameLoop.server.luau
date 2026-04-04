@@ -22,6 +22,18 @@ local MaceMechanic = require(script.Parent.modules.MaceMechanic)
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 
+-- Helper function to lock/unlock player movement during roulette
+local function setPlayersAnchored(playersList, isAnchored)
+    for _, player in ipairs(playersList) do
+        if player and player.Character then
+            local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                rootPart.Anchored = isAnchored
+            end
+        end
+    end
+end
+
 -- Helper function to toggle the visual hammer
 local function setHammerVisibility(visible)
     local hammerSpawn = Workspace:FindFirstChild("HammerSpawn")
@@ -139,11 +151,18 @@ local function gameLoop()
                 setHammerVisibility(true)
 
                 Matchmaking.teleportPlayersToSpawns(activePlayers)
+
+                -- Block player movement while roulette spins
+                setPlayersAnchored(activePlayers, true)
+
                 task.wait(1) -- small delay for physics/camera to settle
 
                 local chosenPlayer = Roulette.selectMaceBearer(activePlayers)
                 if chosenPlayer then
                     Roulette.playRouletteAnimation(chosenPlayer)
+
+                    -- Unblock movement now that roulette has finished
+                    setPlayersAnchored(activePlayers, false)
 
                     -- Hide visual hammer because the player picked it up
                     setHammerVisibility(false)
