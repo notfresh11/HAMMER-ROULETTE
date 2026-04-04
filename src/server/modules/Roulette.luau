@@ -107,10 +107,37 @@ function Roulette.playRouletteAnimation(targetPlayer)
         targetPos = targetPlayer.Character.HumanoidRootPart.Position
     end
 
+    -- Find the 'Tip' part if it exists to precisely calculate the forward vector
+    local tipPart = hammerModel:FindFirstChild("Tip", true)
+
+    local forwardVector
+    if tipPart then
+        -- The direction from the model's pivot to the Tip part
+        forwardVector = (tipPart.Position - initialPivot.Position).Unit
+        -- We only care about the X/Z plane relative direction
+        forwardVector = Vector3.new(forwardVector.X, 0, forwardVector.Z).Unit
+    end
+
     -- For a flat-laying object, the "LookAt" logic changes.
-    -- We create a CFrame that faces the target, and THEN tilt it 90 degrees on X to lie flat.
-    -- To align the visual model (so the tip points at the player), we must apply a Y-axis offset here.
-    local baseLookAtCFrame = CFrame.new(initialPivot.Position, Vector3.new(targetPos.X, initialPivot.Position.Y, targetPos.Z)) * CFrame.Angles(0, math.rad(-90), 0)
+    -- We create a CFrame that faces the target.
+    local dirToTarget = (Vector3.new(targetPos.X, initialPivot.Position.Y, targetPos.Z) - initialPivot.Position).Unit
+
+    local angleOffset = 0
+    if forwardVector and forwardVector.Magnitude > 0 then
+        -- Calculate the angle between the model's default local 'LookVector' (0,0,-1) and the direction to the tip
+        -- We extract the Yaw rotation offset required to align the local Z/LookVector with the Tip
+        local modelForward = initialPivot.LookVector
+        modelForward = Vector3.new(modelForward.X, 0, modelForward.Z).Unit
+
+        -- The signed angle between model's LookVector and the Tip direction
+        angleOffset = math.atan2(modelForward.X*forwardVector.Z - modelForward.Z*forwardVector.X, modelForward.X*forwardVector.X + modelForward.Z*forwardVector.Z)
+    else
+        -- Fallback to the -90 offset if no Tip is found
+        angleOffset = math.rad(-90)
+    end
+
+    -- Apply the LookAt, then apply the calculated offset to align the tip, and THEN tilt it 90 degrees on X to lie flat.
+    local baseLookAtCFrame = CFrame.new(initialPivot.Position, Vector3.new(targetPos.X, initialPivot.Position.Y, targetPos.Z)) * CFrame.Angles(0, angleOffset, 0)
     local targetPivot = baseLookAtCFrame * CFrame.Angles(math.rad(90), 0, 0)
 
     local SPIN_DURATION = 3

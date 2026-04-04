@@ -32,13 +32,23 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             -- Optional: Verify if the tool is equipped
             local tool = character:FindFirstChildWhichIsA("Tool")
             if tool then
-                -- Inform the server that an attack click happened, and pass the debug state
-                attackEvent:FireServer(debugHitboxVisible)
+                -- Inform the server that an attack click happened
+                attackEvent:FireServer()
             end
         end
     elseif input.KeyCode == Enum.KeyCode.L then
         -- Toggle Debug Hitbox visibility
         debugHitboxVisible = not debugHitboxVisible
         print("Mace Debug Hitbox Visible:", debugHitboxVisible)
+
+        local character = player.Character
+        if character then
+            local hitbox = character:FindFirstChild("MaceHitbox")
+            if hitbox then
+                hitbox.Transparency = debugHitboxVisible and 0.8 or 1
+            else
+                warn("Debug: Hitbox-ul 'MaceHitbox' nu a fost găsit. Poate nu este runda ta?")
+            end
+        end
     end
 end)
