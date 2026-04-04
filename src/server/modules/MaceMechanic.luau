@@ -36,6 +36,9 @@ local function playRandomHitSound(parentPart)
     hitSound.Volume = 1
     hitSound.Parent = parentPart
 
+    -- Eliminăm primele secunde "mute" din asset pentru a rezolva problema delay-ului
+    hitSound.TimePosition = 0.2
+
     hitSound:Play()
 
     -- Cleanup automatically
@@ -161,10 +164,11 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
     table.insert(connections, humanoid.StateChanged:Connect(function(oldState, newState)
         if newState == Enum.HumanoidStateType.Freefall then
             isFalling = true
-            if pendingLandingEnd then
-                task.cancel(pendingLandingEnd)
-                pendingLandingEnd = nil
-            end
+            -- Imediat ce e în aer, îi tăiem JumpHeight ca să nu poată ține Space apăsat la nesfârșit (Bunny Hop)
+            humanoid.JumpHeight = 0
+
+            -- NU mai anulăm pendingLandingEnd aici! Se anulează doar dacă dă hit.
+            -- Dacă a aterizat, runda se va închide chiar dacă sistemul crede că a reușit să sară iar.
         elseif newState == Enum.HumanoidStateType.Landed then
             if isFalling and roundActive then
                 -- Adăugăm un mic delay înainte de a opri runda
@@ -251,6 +255,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
             end
 
             isFalling = true
+            -- Îi redăm posibilitatea de jump pentru viitoarea cădere, deși bounce-ul deja îl forțează în sus
+            humanoid.JumpHeight = 60
         end
     end))
 
