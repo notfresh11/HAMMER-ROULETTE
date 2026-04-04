@@ -32,8 +32,8 @@ local function playSoundIsolated(soundId)
     newSound.SoundId = soundId
     newSound.Parent = screenGui
 
-    -- Eliminăm primele milisecunde "mute" pentru a tăia delay-ul din asset-ul de click
-    newSound.TimePosition = 0.25
+    -- Am scos TimePosition = 0.25 pentru că tăia sunetul complet.
+    -- Dacă e un mic delay e din cauza felului în care e encodat asset-ul MP3/OGG de pe Roblox.
 
     -- Distrugem sunetul după ce se termină de redat
     newSound.Ended:Connect(function()
@@ -93,7 +93,11 @@ if mainUI then
         -- Setup default state (Not AFK)
         if yesAfkImg then yesAfkImg.Visible = false end
         if noAfkImg then noAfkImg.Visible = true end
+        local originalFont = Font.new("rbxassetid://12187371840")
+
         if afkTextLabel then
+            -- Salvează fontul original setat de tine din Studio
+            originalFont = afkTextLabel.FontFace
             -- Destroy the Studio-bound text label that might have constraints attached to it
             afkTextLabel:Destroy()
         end
@@ -107,7 +111,7 @@ if mainUI then
         afkTextLabel.Size = UDim2.new(0.5, 0, 0.2, 0)
         afkTextLabel.BackgroundTransparency = 1
         afkTextLabel.TextScaled = true
-        afkTextLabel.FontFace = Font.new("rbxassetid://12187371840", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+        afkTextLabel.FontFace = originalFont
         afkTextLabel.TextTransparency = 1
         afkTextLabel.TextStrokeTransparency = 1
 
@@ -148,10 +152,10 @@ if mainUI then
 
                 if isAFK then
                     afkTextLabel.Text = "You are AFK"
-                    afkTextLabel.TextColor3 = Color3.new(1, 0, 0) -- Red
+                    afkTextLabel.TextColor3 = Color3.new(0, 1, 0) -- Green
                 else
                     afkTextLabel.Text = "You are not AFK"
-                    afkTextLabel.TextColor3 = Color3.new(0, 1, 0) -- Green
+                    afkTextLabel.TextColor3 = Color3.new(1, 0, 0) -- Red
                 end
 
                 -- Create fade out tween after a short delay
@@ -180,11 +184,8 @@ if mainUI then
     for name, frame in pairs(menus) do
         if frame then
             originalMenuSizes[name] = frame.Size
-            -- We also set the AnchorPoint to center for all menus so scaling from 0 looks like a pop-out
-            -- Note: If this breaks their position, user might need to center them properly in Studio.
-            frame.AnchorPoint = Vector2.new(0.5, 0.5)
-            -- Position adjustments might be needed depending on how the user built them,
-            -- but mostly anchor 0.5 makes size tweens grow from center.
+            -- Eliminăm suprascrierea AnchorPoint-ului pentru ca UI-ul să nu se mute
+            -- de la poziția setată în Studio de către tine (cum era cazul la meniul de Quests).
         end
     end
 
@@ -222,8 +223,8 @@ if mainUI then
                         -- Start small
                         targetFrame.Size = UDim2.new(0, 0, 0, 0)
 
-                        -- Tween back to original size with bounce
-                        local tweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out)
+                        -- Tween back to original size with a softer pop-up
+                        local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
                         local tween = TweenService:Create(targetFrame, tweenInfo, {Size = originalSize})
                         tween:Play()
                     end
