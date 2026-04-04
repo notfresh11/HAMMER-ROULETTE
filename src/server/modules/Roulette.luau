@@ -137,35 +137,38 @@ function Roulette.playRouletteAnimation(targetPlayer, currentHammerInstance)
     -- Find the 'Tip' part if it exists to precisely calculate the forward vector
     local tipPart = hammerModel:FindFirstChild("Tip", true)
 
-    -- Noi vrem ca Y-ul (înălțimea) să rămână neschimbat la hammer
-    local flatTargetPos = Vector3.new(targetPos.X, initialPivot.Position.Y, targetPos.Z)
+    -- We create a flat direction vector pointing towards the target player
+    local dirToTarget = (Vector3.new(targetPos.X, initialPivot.Position.Y, targetPos.Z) - initialPivot.Position).Unit
+    if dirToTarget.Magnitude == 0 then dirToTarget = Vector3.new(0, 0, -1) end
 
-    -- Creăm un CFrame care "se uită" direct la jucător (asta aliniază fața Z negativă)
-    local targetLookCFrame = CFrame.lookAt(initialPivot.Position, flatTargetPos)
+    -- We calculate the exact angle to the target player in global space
+    local targetAngleGlobal = math.atan2(-dirToTarget.Z, dirToTarget.X)
 
-    -- Acum ajustăm tilt-ul pentru că ciocanul zace pe jos.
-    -- Dacă e modelat ca un baros în picioare (pe Y), îl lăsăm jos cu 90 de grade:
-    local targetPivot = targetLookCFrame * CFrame.Angles(math.rad(90), 0, 0)
-
-    -- Dacă are un element numit 'Tip', îl folosim ca să corectăm orice rotație ciudată a modelatorului
+    -- Determine how the model's 'Tip' is oriented internally
+    local internalTipOffsetAngle = math.rad(-90) -- Fallback
     if tipPart then
-        -- Ne dăm seama unde este 'Tip' în interiorul CFrame-ului proaspăt calculat
-        local localTipPos = targetPivot:ToObjectSpace(tipPart.CFrame).Position
+        -- Imagine the model standing at origin with no rotation. Where is the Tip?
+        -- We can find the Tip's local position relative to the model's primary pivot.
+        local localTipPos = initialPivot:ToObjectSpace(tipPart.CFrame).Position
 
-        -- Dacă Tip-ul nu este pe axa Z (în față), ci e, de exemplu, pe X... rotim compensatoriu
-        -- Unghiul 2D între (Z=în față, X=dreapta) pe planul podelei modelului
-        local offsetAngle = math.atan2(localTipPos.X, -localTipPos.Z)
-
-        -- Compensăm axa verticală locală care îl rotește fix pe pământ (care după tilt e axa Z, dar aplicăm Y înainte de tilt pt simplitate)
-        targetPivot = targetLookCFrame * CFrame.Angles(0, -offsetAngle, 0) * CFrame.Angles(math.rad(90), 0, 0)
+        -- Because the model is tilted 90 degrees on X *after* the yaw rotation,
+        -- its local axes are rotated. The global "Forward/Z" direction actually corresponds to the local Y-axis when lying flat.
+        -- We just extract the raw 2D angle of the tip on the model's local "floor" plane (X and Y, because it tilts down).
+        internalTipOffsetAngle = math.atan2(-localTipPos.Y, localTipPos.X)
     end
 
-    -- Extragem unghiul de start pentru a face tranziția
-    -- Din cauza rotației pe X, rotația de spinning în plan se face acum pe axa Z global
-    -- Vom obține Y (yaw) înainte să fie lăsat pe jos
-    local startLookCFrame = initialPivot * CFrame.Angles(math.rad(-90), 0, 0)
-    local _, startYaw, _ = startLookCFrame:ToEulerAnglesYXZ()
-    local _, targetYaw, _ = (targetPivot * CFrame.Angles(math.rad(-90), 0, 0)):ToEulerAnglesYXZ()
+    -- We subtract the internal offset from the desired global angle to find the exact Yaw the model must have
+    local finalYaw = targetAngleGlobal - internalTipOffsetAngle
+
+    -- Construct the final base LookAt CFrame using this absolute yaw.
+    local baseLookAtCFrame = CFrame.new(initialPivot.Position) * CFrame.Angles(0, finalYaw, 0)
+    -- Then tilt it 90 degrees to lay flat.
+    local targetPivot = baseLookAtCFrame * CFrame.Angles(math.rad(90), 0, 0)
+
+    -- Extract the Z-axis rotation (spin on the ground) from the initial and target CFrames
+    -- Because it's tilted 90deg on X, "yaw" is now effectively the Z axis relative to local space
+    local _, startYaw, _ = (initialPivot * CFrame.Angles(math.rad(-90), 0, 0)):ToEulerAnglesYXZ()
+    local _, targetYaw, _ = baseLookAtCFrame:ToEulerAnglesYXZ()
 
     local yawDiff = (targetYaw - startYaw + math.pi) % (2 * math.pi) - math.pi
     local totalSpins = 5
@@ -193,21 +196,14 @@ function Roulette.playRouletteAnimation(targetPlayer, currentHammerInstance)
 
         local currentYaw = startYaw + (totalYawToTravel * easeOutAlpha)
 
-        -- Pivotul final per cadru
-        local finalLookCFrame = CFrame.new(initialPivot.Position) * CFrame.Angles(0, currentYaw, 0)
+        -- Build the CFrame: Start at position, apply yaw rotation, then tilt 90deg to lie flat
+        local finalPivot = CFrame.new(initialPivot.Position) * CFrame.Angles(0, currentYaw, 0) * CFrame.Angles(math.rad(90), 0, 0)
 
-        -- Adăugăm compensația Tip dacă există, altfel doar tilt-ul de 90 grade
-        local currentPivot = finalLookCFrame * CFrame.Angles(math.rad(90), 0, 0)
-        if tipPart then
-            local localTipPos = currentPivot:ToObjectSpace(tipPart.CFrame).Position
-            local offsetAngle = math.atan2(localTipPos.X, -localTipPos.Z)
-            currentPivot = finalLookCFrame * CFrame.Angles(0, -offsetAngle, 0) * CFrame.Angles(math.rad(90), 0, 0)
-        end
-
+        -- To prevent fighting with the idle animation, we override its CFrame entirely here
         if isModel then
-            hammerModel:PivotTo(currentPivot)
+            hammerModel:PivotTo(finalPivot)
         else
-            hammerModel.CFrame = currentPivot
+            hammerModel.CFrame = finalPivot
         end
     end)
 

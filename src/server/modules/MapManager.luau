@@ -19,14 +19,9 @@ if not mapStorage then
 end
 
 function MapManager.hideAllMaps()
-    local wholeMap = Workspace:FindFirstChild("WholeMap")
-    if not wholeMap then
-        warn("MapManager: Folderul WholeMap nu există în Workspace!")
-        return
-    end
-
-    -- Muta HammerModel in ServerStorage
-    local hammerModelFolder = wholeMap:FindFirstChild("HammerModel")
+    -- După structura din imagine, ai mutat hărțile direct în ServerStorage!
+    -- Muta HammerModel în MapStorage
+    local hammerModelFolder = ServerStorage:FindFirstChild("HammerModel")
     if hammerModelFolder then
         -- Dacă este folder (cum ai în poză), vrem să scoatem fix Modelul de ciocan din el
         if hammerModelFolder:IsA("Folder") then
@@ -48,9 +43,9 @@ function MapManager.hideAllMaps()
         end
     end
 
-    -- Muta hărțile in ServerStorage si converteste-le in Modele daca sunt Foldere
-    for _, child in ipairs(wholeMap:GetChildren()) do
-        if child.Name:match("^Map") then
+    -- Găsim hărțile din ServerStorage și le convertim în Modele (pentru PivotTo)
+    for _, child in ipairs(ServerStorage:GetChildren()) do
+        if child.Name:match("^Map") and child.Name ~= "MapStorage" then
             -- Avem nevoie ca ele sa fie Model pentru a folosi PivotTo() mai târziu
             local mapModel
             if child:IsA("Folder") then
