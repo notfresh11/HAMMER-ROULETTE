@@ -256,6 +256,16 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
                     local hitPlayer = Players:GetPlayerFromCharacter(hitChar)
                     if hitPlayer then
                         -- KILL!
+
+                        -- Prevent the default Roblox "Oof" / death sound from playing
+                        local victimRoot = hitChar:FindFirstChild("HumanoidRootPart")
+                        if victimRoot then
+                            local defaultDeathSound = victimRoot:FindFirstChild("Died")
+                            if defaultDeathSound and defaultDeathSound:IsA("Sound") then
+                                defaultDeathSound:Destroy()
+                            end
+                        end
+
                         hitHumanoid.Health = 0
                         print(player.Name .. " l-a ucis automat pe " .. hitPlayer.Name .. " (Auto-Hit)!")
 
