@@ -54,17 +54,16 @@ function Roulette.selectMaceBearer(activePlayers)
     return chosenPlayer
 end
 
-function Roulette.playRouletteAnimation(targetPlayer)
+function Roulette.playRouletteAnimation(targetPlayer, currentHammerInstance)
     print("Roulette: Începem animația ruletă către", targetPlayer.Name)
-    local hammerSpawn = Workspace:WaitForChild("HammerSpawn", 10)
-    if not hammerSpawn then
-        warn("Eroare: Nu am găsit folderul HammerSpawn în Workspace!")
-        task.wait(3) -- Wait out the time anyway
+
+    if not currentHammerInstance then
+        warn("Roulette Eroare: Nu a fost pasat niciun ciocan vizual pentru animație!")
+        task.wait(3)
         return
     end
 
-    -- Look for the HammerModel inside the folder
-    local hammerModel = hammerSpawn:WaitForChild("HammerModel", 10)
+    local hammerModel = currentHammerInstance
     local isModel = hammerModel:IsA("Model")
     local isBasePart = hammerModel:IsA("BasePart")
 
