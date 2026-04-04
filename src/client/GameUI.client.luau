@@ -33,7 +33,7 @@ local function playSoundIsolated(soundId)
     newSound.Parent = screenGui
 
     -- Eliminăm primele milisecunde "mute" pentru a tăia delay-ul din asset-ul de click
-    newSound.TimePosition = 0.1
+    newSound.TimePosition = 0.25
 
     -- Distrugem sunetul după ce se termină de redat
     newSound.Ended:Connect(function()
@@ -85,21 +85,26 @@ if mainUI then
         local noAfkImg = afkButton:FindFirstChild("NoAFK")
         local afkTextLabel = afkButton:FindFirstChild("TextLabel")
 
-        -- Setup default state
+        -- Setup default state (Not AFK)
         if yesAfkImg then yesAfkImg.Visible = false end
         if noAfkImg then noAfkImg.Visible = true end
         if afkTextLabel then
-            -- Reparent to screenGui to prevent it from inheriting the hover scaling of the AFKButton
-            afkTextLabel.Parent = screenGui
-            -- Center it completely on the screen
-            afkTextLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-            afkTextLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
-            -- Increase size so it's readable
-            afkTextLabel.Size = UDim2.new(0.5, 0, 0.2, 0)
-
-            afkTextLabel.TextTransparency = 1
-            afkTextLabel.TextStrokeTransparency = 1
+            -- Destroy the Studio-bound text label that might have constraints attached to it
+            afkTextLabel:Destroy()
         end
+
+        -- Create a brand new TextLabel explicitly to guarantee it ignores all MAINUI constraints
+        afkTextLabel = Instance.new("TextLabel")
+        afkTextLabel.Name = "AFKNotificationText"
+        afkTextLabel.Parent = screenGui
+        afkTextLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+        afkTextLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+        afkTextLabel.Size = UDim2.new(0.5, 0, 0.2, 0)
+        afkTextLabel.BackgroundTransparency = 1
+        afkTextLabel.TextScaled = true
+        afkTextLabel.FontFace = Font.new("rbxassetid://12187371840", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+        afkTextLabel.TextTransparency = 1
+        afkTextLabel.TextStrokeTransparency = 1
 
         -- Make sure default color matches default state (NOAFK = Red)
         afkButton.BackgroundColor3 = Color3.new(1, 0, 0)
@@ -108,7 +113,7 @@ if mainUI then
             playSoundIsolated(clickSoundId)
             isAFK = not isAFK
 
-            -- Update Images - The logic was: YesAFK visible when IS AFK (true), NoAFK visible when NOT AFK (false)
+            -- Update Images (Standard logic: YesAFK visible when IS AFK, NoAFK visible when NOT AFK)
             if yesAfkImg then yesAfkImg.Visible = isAFK end
             if noAfkImg then noAfkImg.Visible = not isAFK end
 
