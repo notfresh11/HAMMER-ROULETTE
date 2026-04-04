@@ -32,6 +32,9 @@ local function playSoundIsolated(soundId)
     newSound.SoundId = soundId
     newSound.Parent = screenGui
 
+    -- Eliminăm primele milisecunde "mute" pentru a tăia delay-ul din asset-ul de click
+    newSound.TimePosition = 0.1
+
     -- Distrugem sunetul după ce se termină de redat
     newSound.Ended:Connect(function()
         newSound:Destroy()
@@ -61,6 +64,13 @@ if mainUI then
     local shopGui = playerGui:WaitForChild("Shop", 5)
     local settingsGui = playerGui:WaitForChild("Settings", 5)
 
+    -- Force Enable all root ScreenGuis in case user disabled them in Studio to save space
+    if questsGui then questsGui.Enabled = true end
+    if discordGui then discordGui.Enabled = true end
+    if statsGui then statsGui.Enabled = true end
+    if shopGui then shopGui.Enabled = true end
+    if settingsGui then settingsGui.Enabled = true end
+
     -- AFK Component Setup
     local afkButton = mainUI:FindFirstChild("AFKButton")
     local isAFK = false
@@ -79,17 +89,35 @@ if mainUI then
         if yesAfkImg then yesAfkImg.Visible = false end
         if noAfkImg then noAfkImg.Visible = true end
         if afkTextLabel then
+            -- Reparent to screenGui to prevent it from inheriting the hover scaling of the AFKButton
+            afkTextLabel.Parent = screenGui
+            -- Center it completely on the screen
+            afkTextLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+            afkTextLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+            -- Increase size so it's readable
+            afkTextLabel.Size = UDim2.new(0.5, 0, 0.2, 0)
+
             afkTextLabel.TextTransparency = 1
             afkTextLabel.TextStrokeTransparency = 1
         end
+
+        -- Make sure default color matches default state (NOAFK = Red)
+        afkButton.BackgroundColor3 = Color3.new(1, 0, 0)
 
         afkButton.MouseButton1Click:Connect(function()
             playSoundIsolated(clickSoundId)
             isAFK = not isAFK
 
-            -- Update Images
+            -- Update Images - The logic was: YesAFK visible when IS AFK (true), NoAFK visible when NOT AFK (false)
             if yesAfkImg then yesAfkImg.Visible = isAFK end
             if noAfkImg then noAfkImg.Visible = not isAFK end
+
+            -- Update Background Color of the button itself
+            if isAFK then
+                afkButton.BackgroundColor3 = Color3.new(0, 1, 0) -- Green
+            else
+                afkButton.BackgroundColor3 = Color3.new(1, 0, 0) -- Red
+            end
 
             -- Inform Server
             toggleAfkEvent:FireServer(isAFK)
