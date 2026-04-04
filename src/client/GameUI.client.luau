@@ -83,8 +83,8 @@ local function setupUI()
     local clickSoundId = "rbxassetid://124476359159008"
 
     -- Fetching the components based on the user's hierarchy
-    local questsGui = playerGui:WaitForChild("Quests")
-    local discordGui = playerGui:WaitForChild("Discord")
+    local questsGui = playerGui:WaitForChild("Quests", 5)
+    local discordGui = playerGui:WaitForChild("Discord", 5)
     local statsGui = playerGui:WaitForChild("Stats")
     local shopGui = playerGui:WaitForChild("Shop")
     local settingsGui = playerGui:WaitForChild("Settings")
@@ -93,6 +93,89 @@ local function setupUI()
     if questsGui then questsGui.Enabled = true end
     if discordGui then discordGui.Enabled = true end
     if statsGui then statsGui.Enabled = true end
+
+    -- PROGRESSION UI SETUP
+    local levelFrame = mainUI:FindFirstChild("Level")
+    if levelFrame then
+        local innerFrame = levelFrame:FindFirstChild("Frame")
+        if innerFrame then
+            local avatarHolder = innerFrame:FindFirstChild("Avatar")
+            local levelTotal = innerFrame:FindFirstChild("LevelTotal")
+            local levelDone = innerFrame:FindFirstChild("LevelDone")
+            local xpProgress = innerFrame:FindFirstChild("XPProgress")
+            local lvlProgress = innerFrame:FindFirstChild("LVLProgress")
+
+            -- Setup Avatar Image
+            if avatarHolder and avatarHolder:IsA("Frame") then
+                local imgAvatar = Instance.new("ImageLabel")
+                imgAvatar.Name = "Avatar"
+                imgAvatar.Size = avatarHolder.Size
+                imgAvatar.Position = avatarHolder.Position
+                imgAvatar.AnchorPoint = avatarHolder.AnchorPoint
+                imgAvatar.BackgroundTransparency = 1
+
+                -- Attempt to get thumbnail
+                task.spawn(function()
+                    local success, thumb, ready = pcall(function()
+                        return Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+                    end)
+                    if success and ready then
+                        imgAvatar.Image = thumb
+                    end
+                end)
+
+                imgAvatar.Parent = innerFrame
+                avatarHolder:Destroy()
+            elseif avatarHolder and avatarHolder:IsA("ImageLabel") then
+                -- Already converted, just update image
+                task.spawn(function()
+                    local success, thumb, ready = pcall(function()
+                        return Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+                    end)
+                    if success and ready then
+                        avatarHolder.Image = thumb
+                    end
+                end)
+            end
+
+            -- Setup initial bar colors
+            if levelTotal then levelTotal.BackgroundColor3 = Color3.new(1, 1, 1) end -- Alb
+            if levelDone then levelDone.BackgroundColor3 = Color3.new(1, 0, 0) end -- Rosu
+
+            -- Ascultăm UpdateStatsEvent
+            local updateStatsEvent = ReplicatedStorage:WaitForChild("UpdateStatsEvent", 5)
+            if updateStatsEvent then
+                table.insert(activeConnections, updateStatsEvent.OnClientEvent:Connect(function(level, currentXp, requiredXp, coins)
+                    -- Update XP Texts
+                    if lvlProgress then lvlProgress.Text = "LVL " .. tostring(level) end
+                    if xpProgress then xpProgress.Text = tostring(math.floor(currentXp)) .. "/" .. tostring(math.floor(requiredXp)) end
+
+                    -- Update Bar Size (assuming left anchored, so we tween X Scale)
+                    if levelDone and levelTotal then
+                        local ratio = math.clamp(currentXp / requiredXp, 0, 1)
+                        -- Putem folosi tween pt un efect smooth
+                        local targetSize = UDim2.new(ratio, 0, levelDone.Size.Y.Scale, levelDone.Size.Y.Offset)
+                        TweenService:Create(levelDone, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
+                    end
+
+                    -- Update Shop Coins Button
+                    local shopGuiRef = playerGui:FindFirstChild("Shop")
+                    if shopGuiRef then
+                        local shopMainFrame = shopGuiRef:FindFirstChild("MainFrame")
+                        if shopMainFrame then
+                            local coinsBtn = shopMainFrame:FindFirstChild("CoinsButton")
+                            if coinsBtn then
+                                local coinsText = coinsBtn:FindFirstChild("TextLabel")
+                                if coinsText then
+                                    coinsText.Text = tostring(math.floor(coins))
+                                end
+                            end
+                        end
+                    end
+                end))
+            end
+        end
+    end
     if shopGui then shopGui.Enabled = true end
     if settingsGui then settingsGui.Enabled = true end
 

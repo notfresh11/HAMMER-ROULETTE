@@ -38,6 +38,7 @@ local Roulette = require(script.Parent.modules.Roulette)
 local MaceMechanic = require(script.Parent.modules.MaceMechanic)
 local MapManager = require(script.Parent.modules.MapManager)
 local DataManager = require(script.Parent.modules.DataManager)
+local ProgressionManager = require(script.Parent.modules.ProgressionManager)
 
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
@@ -46,6 +47,12 @@ local Players = game:GetService("Players")
 -- Hook up DataManager to handle player connections
 Players.PlayerAdded:Connect(function(player)
     DataManager.loadPlayerData(player)
+    -- Sync initial values to UI
+    task.spawn(function()
+        -- Wait slightly to allow client UI to initialize
+        task.wait(2)
+        ProgressionManager.SyncDataToClient(player)
+    end)
 end)
 
 Players.PlayerRemoving:Connect(function(player)
@@ -138,10 +145,11 @@ local function gameLoop()
             local activePlayers = Matchmaking.getActivePlayers()
             print("MainLoop: Meciul a început cu " .. #activePlayers .. " jucători!")
 
-            -- Ascundem MAINUI pentru toți jucătorii activi
+            -- Rewards for participation & Hide UI
             local toggleMainUiEvent = ReplicatedStorage:FindFirstChild("ToggleMainUIEvent")
-            if toggleMainUiEvent then
-                for _, player in ipairs(activePlayers) do
+            for _, player in ipairs(activePlayers) do
+                ProgressionManager.ProcessMatchParticipation(player)
+                if toggleMainUiEvent then
                     toggleMainUiEvent:FireClient(player, false)
                 end
             end
@@ -191,6 +199,9 @@ local function gameLoop()
                     for _, player in ipairs(activePlayers) do
                         if player.Character and player.Character:FindFirstChild("Humanoid") then
                             table.insert(deathConnections, player.Character.Humanoid.Died:Connect(function()
+                                -- Reset streaks on death
+                                ProgressionManager.ResetStreaks(player)
+
                                 -- Scoatem jucătorul mort din lista de supraviețuitori ai meciului
                                 local idx = table.find(activePlayers, player)
                                 if idx then
@@ -215,6 +226,11 @@ local function gameLoop()
                             roundEnded = true
                         end
                         task.wait(0.5)
+                    end
+
+                    -- Reward survivals at round end
+                    for _, activeP in ipairs(activePlayers) do
+                        ProgressionManager.ProcessRoundSurvive(activeP)
                     end
 
                     -- Clean up death connections
@@ -245,6 +261,10 @@ local function gameLoop()
                 if #activePlayers == 1 then
                     local winner = activePlayers[1]
                     print("MainLoop: MECIUL S-A TERMINAT! Câștigătorul este: " .. winner.Name)
+
+                    -- Match Win Rewards
+                    ProgressionManager.ProcessMatchWin(winner)
+
                     -- Reafișăm MAINUI pentru câștigător
                     if toggleMainUiEvent then
                         toggleMainUiEvent:FireClient(winner, true)

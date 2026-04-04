@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
+local ProgressionManager = require(script.Parent.ProgressionManager)
 
 local currentTool = nil
 local connections = {}
@@ -282,6 +283,9 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
 
                         hitHumanoid.Health = 0
                         print(player.Name .. " l-a ucis automat pe " .. hitPlayer.Name .. " (Auto-Hit)!")
+
+                        -- Add Kill Reward
+                        ProgressionManager.ProcessKill(player)
 
                         hitRegistered = true
                         lastHitTick = tick()

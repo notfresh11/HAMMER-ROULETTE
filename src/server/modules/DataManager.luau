@@ -12,7 +12,10 @@ local INITIAL_DATA = {
     Level = 1,
     Xp = 0,
     Coins = 0,
-    Items = {}
+    Items = {},
+    KillStreak = 0,
+    WinStreak = 0,
+    SurviveStreak = 0
 }
 
 -- Deep copy function to avoid modifying the template
@@ -56,6 +59,12 @@ function DataManager.loadPlayerData(player)
         -- Important: If Roblox DataStores are down, we kick the player to prevent data loss.
         warn("Failed to load data for " .. player.Name .. ". Error: " .. tostring(errorMessage))
         player:Kick("Eroare la încărcarea datelor (Roblox DataStores ar putea fi căzute). Te rugăm să reintri pe joc pentru a nu-ți pierde progresul!")
+        return
+    end
+
+    if not player.Parent then
+        -- The player left the game while we were fetching their data from Roblox servers
+        -- Don't keep their data floating in server memory
         return
     end
 
