@@ -17,7 +17,7 @@ end
 
 -- UI Events
 -- UI Events and VFX
-local uiEvents = {"ShowCountdownEvent", "ShowTextEvent", "HideTextEvent", "VfxEvent", "ToggleAFKEvent"}
+local uiEvents = {"ShowCountdownEvent", "ShowTextEvent", "HideTextEvent", "VfxEvent", "ToggleAFKEvent", "ToggleMainUIEvent"}
 for _, evName in ipairs(uiEvents) do
     if not ReplicatedStorage:FindFirstChild(evName) then
         local ev = Instance.new("RemoteEvent")
@@ -120,6 +120,14 @@ local function gameLoop()
             local activePlayers = Matchmaking.getActivePlayers()
             print("MainLoop: Meciul a început cu " .. #activePlayers .. " jucători!")
 
+            -- Ascundem MAINUI pentru toți jucătorii activi
+            local toggleMainUiEvent = ReplicatedStorage:FindFirstChild("ToggleMainUIEvent")
+            if toggleMainUiEvent then
+                for _, player in ipairs(activePlayers) do
+                    toggleMainUiEvent:FireClient(player, false)
+                end
+            end
+
             -- Handle disconnects during the match to prevent softlocking
             local disconnectConnection = Players.PlayerRemoving:Connect(function(leavingPlayer)
                 local idx = table.find(activePlayers, leavingPlayer)
@@ -170,6 +178,10 @@ local function gameLoop()
                                 if idx then
                                     table.remove(activePlayers, idx)
                                     print("MainLoop: " .. player.Name .. " a fost ELIMINAT din meci!")
+                                    -- Afișăm MAINUI din nou pentru cel eliminat
+                                    if toggleMainUiEvent then
+                                        toggleMainUiEvent:FireClient(player, true)
+                                    end
                                 end
                             end))
                         end
@@ -215,6 +227,10 @@ local function gameLoop()
                 if #activePlayers == 1 then
                     local winner = activePlayers[1]
                     print("MainLoop: MECIUL S-A TERMINAT! Câștigătorul este: " .. winner.Name)
+                    -- Reafișăm MAINUI pentru câștigător
+                    if toggleMainUiEvent then
+                        toggleMainUiEvent:FireClient(winner, true)
+                    end
 
                     -- Teleport winner to a default roblox spawn location
                     if winner.Character and winner.Character:FindFirstChild("HumanoidRootPart") then
