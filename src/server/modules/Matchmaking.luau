@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
 local MIN_PLAYERS = 2
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 function Matchmaking.waitForPlayers()
     print("Matchmaking: Așteptăm minim " .. MIN_PLAYERS .. " jucători...")
@@ -14,14 +15,41 @@ function Matchmaking.waitForPlayers()
     end
 
     print("Matchmaking: Avem suficienți jucători. Începem în 10 secunde.")
+    local showCountdownEvent = ReplicatedStorage:WaitForChild("ShowCountdownEvent")
+    local showTextEvent = ReplicatedStorage:WaitForChild("ShowTextEvent")
+    local hideTextEvent = ReplicatedStorage:WaitForChild("HideTextEvent")
+
+    local COUNTDOWN_SOUND = "rbxassetid://110001162763213"
+    local START_SOUND = "rbxassetid://77736543307386"
+
     for i = 10, 1, -1 do
         print(i .. "...")
+
+        -- Logică culori
+        local color = Color3.new(1, 0, 0) -- Roșu default (10 - 3)
+        if i == 2 then
+            color = Color3.new(1, 1, 0) -- Galben
+        elseif i == 1 then
+            color = Color3.new(0, 1, 0) -- Verde
+        end
+
+        showCountdownEvent:FireAllClients(i, color, COUNTDOWN_SOUND)
+
         task.wait(1)
         if #Players:GetPlayers() < MIN_PLAYERS then
             print("Matchmaking anulat: Număr insuficient de jucători.")
+            showTextEvent:FireAllClients("Matchmaking cancelled", Color3.new(1, 0, 0), "")
+            task.wait(2)
+            hideTextEvent:FireAllClients()
             return false
         end
     end
+
+    showTextEvent:FireAllClients("The Game Has Started", Color3.new(0, 1, 0), START_SOUND)
+    task.delay(2, function()
+        hideTextEvent:FireAllClients()
+    end)
+
     return true
 end
 
