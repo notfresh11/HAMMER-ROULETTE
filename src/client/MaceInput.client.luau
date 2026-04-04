@@ -14,6 +14,23 @@ if not attackEvent then
     return
 end
 
+local bounceEventName = "MaceBounceEvent"
+local bounceEvent = ReplicatedStorage:WaitForChild(bounceEventName)
+
+if bounceEvent then
+    bounceEvent.OnClientEvent:Connect(function()
+        local character = player.Character
+        if character then
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                -- Set the velocity directly to ensure bounce on client-owned physics
+                local currentVel = rootPart.AssemblyLinearVelocity
+                rootPart.AssemblyLinearVelocity = Vector3.new(currentVel.X, 100, currentVel.Z)
+            end
+        end
+    end)
+end
+
 local debugHitboxVisible = false
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)

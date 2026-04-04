@@ -8,6 +8,13 @@ if not ReplicatedStorage:FindFirstChild(maceEventName) then
     event.Parent = ReplicatedStorage
 end
 
+local maceBounceEventName = "MaceBounceEvent"
+if not ReplicatedStorage:FindFirstChild(maceBounceEventName) then
+    local event = Instance.new("RemoteEvent")
+    event.Name = maceBounceEventName
+    event.Parent = ReplicatedStorage
+end
+
 local Matchmaking = require(script.Parent.modules.Matchmaking)
 local Roulette = require(script.Parent.modules.Roulette)
 local MaceMechanic = require(script.Parent.modules.MaceMechanic)
@@ -201,7 +208,33 @@ local function gameLoop()
 
             -- Dacă bucla de runde s-a terminat, înseamnă că meciul s-a încheiat (avem <= 1 supraviețuitori)
             if #activePlayers == 1 then
-                print("MainLoop: MECIUL S-A TERMINAT! Câștigătorul este: " .. activePlayers[1].Name)
+                local winner = activePlayers[1]
+                print("MainLoop: MECIUL S-A TERMINAT! Câștigătorul este: " .. winner.Name)
+
+                -- Teleport winner to a default roblox spawn location
+                if winner.Character and winner.Character:FindFirstChild("HumanoidRootPart") then
+                    local rootPart = winner.Character.HumanoidRootPart
+                    local spawns = {}
+
+                    -- Search for any SpawnLocation in Workspace
+                    for _, obj in ipairs(Workspace:GetDescendants()) do
+                        if obj:IsA("SpawnLocation") then
+                            table.insert(spawns, obj)
+                        end
+                    end
+
+                    if #spawns > 0 then
+                        -- Pick a random spawn point to teleport the winner
+                        local chosenSpawn = spawns[math.random(1, #spawns)]
+                        -- Y offset is half the spawn height + half character height roughly, 5 is a safe amount
+                        rootPart.CFrame = chosenSpawn.CFrame * CFrame.new(0, chosenSpawn.Size.Y/2 + 3, 0)
+                        print("MainLoop: Câștigătorul a fost teleportat la spawn.")
+                    else
+                        -- Fallback just in case no default spawn exists
+                        rootPart.CFrame = CFrame.new(0, 50, 0)
+                        warn("MainLoop: Nu s-a găsit niciun SpawnLocation în Workspace. S-a folosit coordonata de fallback.")
+                    end
+                end
             else
                 print("MainLoop: MECIUL S-A TERMINAT! Nu există niciun câștigător valid.")
             end
