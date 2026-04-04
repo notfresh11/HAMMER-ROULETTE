@@ -12,8 +12,9 @@ screenGui.Parent = playerGui
 
 local textLabel = Instance.new("TextLabel")
 textLabel.Name = "CenterText"
-textLabel.Size = UDim2.new(1, 0, 0.2, 0)
-textLabel.Position = UDim2.new(0, 0, 0.4, 0) -- Centrat
+textLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+textLabel.Size = UDim2.new(1, 0, 0.35, 0) -- Mărit pe Y pentru text mai mare
+textLabel.Position = UDim2.new(0.5, 0, 0.5, 0) -- Exact pe centrul ecranului
 textLabel.BackgroundTransparency = 1
 textLabel.FontFace = Font.new("rbxassetid://12187371840")
 textLabel.TextScaled = true
@@ -23,9 +24,28 @@ textLabel.Text = ""
 textLabel.Visible = false
 textLabel.Parent = screenGui
 
--- Sound Setup
-local soundPlayer = Instance.new("Sound")
-soundPlayer.Parent = screenGui
+-- Funcție dedicată pentru a reda sunete izolate care nu se anulează între ele
+local function playSoundIsolated(soundId)
+    if not soundId or soundId == "" then return end
+
+    local newSound = Instance.new("Sound")
+    newSound.SoundId = soundId
+    newSound.Parent = screenGui
+
+    -- Distrugem sunetul după ce se termină de redat
+    newSound.Ended:Connect(function()
+        newSound:Destroy()
+    end)
+
+    -- Măsură de siguranță în caz că sunetul are eroare la încărcare
+    task.delay(10, function()
+        if newSound and newSound.Parent then
+            newSound:Destroy()
+        end
+    end)
+
+    newSound:Play()
+end
 
 -- Remote Events
 local showCountdown = ReplicatedStorage:WaitForChild("ShowCountdownEvent", 10)
@@ -38,10 +58,7 @@ if showCountdown then
         textLabel.TextColor3 = colorCode
         textLabel.Visible = true
 
-        if soundId and soundId ~= "" then
-            soundPlayer.SoundId = soundId
-            soundPlayer:Play()
-        end
+        playSoundIsolated(soundId)
     end)
 end
 
@@ -51,10 +68,7 @@ if showText then
         textLabel.TextColor3 = colorCode or Color3.new(1, 1, 1)
         textLabel.Visible = true
 
-        if soundId and soundId ~= "" then
-            soundPlayer.SoundId = soundId
-            soundPlayer:Play()
-        end
+        playSoundIsolated(soundId)
     end)
 end
 
