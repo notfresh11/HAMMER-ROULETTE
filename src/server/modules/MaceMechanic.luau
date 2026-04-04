@@ -10,6 +10,38 @@ local connections = {}
 local roundActive = false
 local currentPlayer = nil
 
+-- Hit Sounds Setup
+local hitSoundIds = {
+    "rbxassetid://77574533044558",
+    "rbxassetid://114348072835488",
+    "rbxassetid://89154534119930",
+    "rbxassetid://108830942760951"
+}
+local lastHitSoundIndex = 0
+
+-- Helper function to play a 3D random hit sound without repeating the same one twice
+local function playRandomHitSound(parentPart)
+    if #hitSoundIds == 0 then return end
+
+    local randomIndex = math.random(1, #hitSoundIds)
+    -- Asigură-te că nu e la fel cu ultimul redat
+    if #hitSoundIds > 1 and randomIndex == lastHitSoundIndex then
+        randomIndex = (randomIndex % #hitSoundIds) + 1
+    end
+    lastHitSoundIndex = randomIndex
+
+    local hitSound = Instance.new("Sound")
+    hitSound.SoundId = hitSoundIds[randomIndex]
+    hitSound.RollOffMaxDistance = 150 -- Distanța la care se aude
+    hitSound.Volume = 1
+    hitSound.Parent = parentPart
+
+    hitSound:Play()
+
+    -- Cleanup automatically
+    game:GetService("Debris"):AddItem(hitSound, 5)
+end
+
 -- Visual Debug Hitbox Helper
 local function createDebugHitbox(cframe, size)
     local part = Instance.new("Part")
@@ -191,6 +223,12 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
 
                         hitRegistered = true
                         lastHitTick = tick()
+
+                        -- Play Random 3D Sound attached to the victim
+                        local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
+                        if targetRoot then
+                            playRandomHitSound(targetRoot)
+                        end
 
                         -- Bounce the attacker
                         local bounceEvent = ReplicatedStorage:FindFirstChild("MaceBounceEvent")
