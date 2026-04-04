@@ -171,6 +171,26 @@ local function setupUI()
         end)
     end
 
+    -- Curățăm și pentru Matchmaking UI event
+    if _G.UpdateMatchmakingUIConnection then
+        _G.UpdateMatchmakingUIConnection:Disconnect()
+        _G.UpdateMatchmakingUIConnection = nil
+    end
+
+    local updateMatchmakingEvent = ReplicatedStorage:WaitForChild("UpdateMatchmakingUIEvent", 10)
+    if updateMatchmakingEvent then
+        _G.UpdateMatchmakingUIConnection = updateMatchmakingEvent.OnClientEvent:Connect(function(textMsg, soundId)
+            local matchmakingUI = mainUI:FindFirstChild("MatchmakingUI")
+            if matchmakingUI and matchmakingUI:IsA("TextLabel") then
+                matchmakingUI.Text = textMsg or ""
+                matchmakingUI.Visible = (textMsg and textMsg ~= "")
+            end
+            if soundId and soundId ~= "" then
+                playSoundIsolated(soundId)
+            end
+        end)
+    end
+
     -- Menu Toggling Logic
     local menus = {
         ShopButton = shopGui and shopGui:FindFirstChild("MainFrame"),
