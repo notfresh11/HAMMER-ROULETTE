@@ -358,6 +358,14 @@ local function setupUI()
                 showShopTab("Currency")
             end))
         end
+
+        local coinsBtn = shopFrame:FindFirstChild("CoinsButton")
+        if coinsBtn then
+            table.insert(activeConnections, coinsBtn.MouseButton1Click:Connect(function()
+                playSoundIsolated(clickSoundId)
+                showShopTab("Currency")
+            end))
+        end
     end
 
     -- Hover Animations for standard buttons (Scale Up)
