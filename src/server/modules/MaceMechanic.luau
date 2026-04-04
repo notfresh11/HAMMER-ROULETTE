@@ -81,6 +81,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
     hitboxPart.CFrame = rootPart.CFrame * CFrame.new(0, -6, -2)
     hitboxPart.Anchored = false
     hitboxPart.CanCollide = false
+    hitboxPart.CanTouch = false
+    hitboxPart.CanQuery = false
     hitboxPart.Massless = true
     hitboxPart.Transparency = 1
     hitboxPart.Color = Color3.new(1, 0, 0)
@@ -121,15 +123,26 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
     MaceMechanic.forceStopMechanic = cleanup
 
     -- Track jumping/falling
+    local pendingLandingEnd = nil
+
     table.insert(connections, humanoid.StateChanged:Connect(function(oldState, newState)
         if newState == Enum.HumanoidStateType.Freefall then
             isFalling = true
+            if pendingLandingEnd then
+                task.cancel(pendingLandingEnd)
+                pendingLandingEnd = nil
+            end
         elseif newState == Enum.HumanoidStateType.Landed then
             if isFalling and roundActive then
-                -- Player landed (Miss). End round.
-                print(player.Name .. " a aterizat. Rateu! Runda se încheie.")
-                cleanup()
-                onRoundEndCallback()
+                -- Adăugăm un mic delay înainte de a opri runda
+                -- Acest lucru permite procesarea unui atac declanșat fix înainte de a atinge solul
+                pendingLandingEnd = task.delay(0.2, function()
+                    if roundActive then
+                        print(player.Name .. " a aterizat. Rateu! Runda se încheie.")
+                        cleanup()
+                        onRoundEndCallback()
+                    end
+                end)
             end
             isFalling = false
         end
@@ -146,9 +159,10 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
             local now = tick()
             if now - lastAttackTime < ATTACK_COOLDOWN then return end
 
-            -- Must be in the air (jumping or falling)
+            -- Ne bazăm pe client că a fost în aer, dar validăm și pe server
+            -- Dacă clientul a trimis atacul, dar pe server a aterizat exact în același moment, îl permitem (prin grace period).
             local inAir = (humanoid.FloorMaterial == Enum.Material.Air)
-            if not inAir then return end
+            if not inAir and not pendingLandingEnd then return end
 
             lastAttackTime = now
 
@@ -190,8 +204,18 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
                     hitHumanoid.Health = 0
                     print(player.Name .. " l-a ucis pe " .. hitPlayer.Name .. " cu un atac mid-air!")
 
+                    -- Anulăm oprirea rundei dacă atacul a fost un succes exact în momentul aterizării
+                    if pendingLandingEnd then
+                        task.cancel(pendingLandingEnd)
+                        pendingLandingEnd = nil
+                    end
+
                     -- The Bounce (Apply Impulse upwards)
-                    rootPart:ApplyImpulse(Vector3.new(0, rootPart.AssemblyMass * 100, 0))
+                    -- Am înlocuit cu un Event către client, deoarece NetworkOwnership-ul previne ApplyImpulse de pe server
+                    local bounceEvent = ReplicatedStorage:FindFirstChild("MaceBounceEvent")
+                    if bounceEvent then
+                        bounceEvent:FireClient(player)
+                    end
 
                     -- Round continues, they can fall and hit again!
                     isFalling = true
