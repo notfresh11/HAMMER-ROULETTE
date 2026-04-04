@@ -3,6 +3,7 @@ local ServerStorage = game:GetService("ServerStorage")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 
 local currentTool = nil
 local connections = {}
@@ -75,10 +76,10 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
     -- Create Permanent Hitbox Part
     local hitboxPart = Instance.new("Part")
     hitboxPart.Name = "MaceHitbox"
-    -- Make it longer downwards
-    hitboxPart.Size = Vector3.new(14, 24, 14)
-    -- Position slightly in front and further down
-    hitboxPart.CFrame = rootPart.CFrame * CFrame.new(0, -6, -2)
+    -- Mărime redusă conform cerinței (9x9x9)
+    hitboxPart.Size = Vector3.new(9, 9, 9)
+    -- Centrat puțin mai jos de RootPart ca să acopere zona de impact
+    hitboxPart.CFrame = rootPart.CFrame * CFrame.new(0, -4, 0)
     hitboxPart.Anchored = false
     hitboxPart.CanCollide = false
     hitboxPart.CanTouch = false
@@ -148,94 +149,72 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
         end
     end))
 
-    -- Spatial query attack logic replaces the `.Touched` event
-    local lastAttackTime = 0
-    local ATTACK_COOLDOWN = 0.5
+    -- Spatial query attack logic - AUTO HIT
+    local lastHitTick = 0
+    local AUTO_HIT_COOLDOWN = 0.5 -- prevent double hits on same frame
 
-    if attackEvent then
-        table.insert(connections, attackEvent.OnServerEvent:Connect(function(plr)
-            if not roundActive or plr ~= player then
-                print("Server Attack Rejected: Round not active or wrong player.")
-                return
-            end
+    table.insert(connections, RunService.Heartbeat:Connect(function()
+        if not roundActive or not player then return end
 
-            local now = tick()
-            if now - lastAttackTime < ATTACK_COOLDOWN then
-                print("Server Attack Rejected: Cooldown.")
-                return
-            end
+        -- Verificăm dacă e în aer. isFalling este setat de StateChanged Freefall
+        local currentState = humanoid:GetState()
+        local inAirState = (currentState == Enum.HumanoidStateType.Freefall)
 
-            -- Validare relaxată: Clientul e de încredere pentru aer (din scriptul local)
-            -- Dar pe server, permitem lovitura dacă starea curentă e Freefall SAU suntem în "grace period" (abia a aterizat)
-            local currentState = humanoid:GetState()
-            local inAirState = (currentState == Enum.HumanoidStateType.Freefall)
+        if not inAirState and not pendingLandingEnd then
+            return
+        end
 
-            if not inAirState and not pendingLandingEnd then
-                print("Server Attack Rejected: Not in air and no grace period. State:", currentState.Name)
-                return
-            end
+        local now = tick()
+        if now - lastHitTick < AUTO_HIT_COOLDOWN then return end
 
-            lastAttackTime = now
-            print("Server Attack Validated! Checking for targets...")
+        local boxSize = hitboxPart.Size
+        local boxCFrame = hitboxPart.CFrame
 
-            local boxSize = hitboxPart.Size
-            local boxCFrame = hitboxPart.CFrame
+        local overlapParams = OverlapParams.new()
+        overlapParams.FilterType = Enum.RaycastFilterType.Exclude
+        overlapParams.FilterDescendantsInstances = {character}
 
-            local overlapParams = OverlapParams.new()
-            overlapParams.FilterType = Enum.RaycastFilterType.Exclude
-            overlapParams.FilterDescendantsInstances = {character}
+        local partsInBox = Workspace:GetPartBoundsInBox(boxCFrame, boxSize, overlapParams)
 
-            local partsInBox = Workspace:GetPartBoundsInBox(boxCFrame, boxSize, overlapParams)
-            print("Părți găsite în hitbox:", #partsInBox)
+        local hitRegistered = false
 
-            local closestPlayer = nil
-            local closestDist = math.huge
+        for _, part in ipairs(partsInBox) do
+            local hitChar = part:FindFirstAncestorWhichIsA("Model")
+            if hitChar then
+                local hitHumanoid = hitChar:FindFirstChild("Humanoid")
+                if hitHumanoid and hitHumanoid.Health > 0 then
+                    local hitPlayer = Players:GetPlayerFromCharacter(hitChar)
+                    if hitPlayer then
+                        -- KILL!
+                        hitHumanoid.Health = 0
+                        print(player.Name .. " l-a ucis automat pe " .. hitPlayer.Name .. " (Auto-Hit)!")
 
-            for _, part in ipairs(partsInBox) do
-                -- Part could be inside an Accessory, so we find the actual character model
-                local hitChar = part:FindFirstAncestorWhichIsA("Model")
-                if hitChar then
-                    local hitHumanoid = hitChar:FindFirstChild("Humanoid")
-                    if hitHumanoid and hitHumanoid.Health > 0 then
-                        local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
-                        if targetRoot then
-                            local dist = (rootPart.Position - targetRoot.Position).Magnitude
-                            if dist < closestDist then
-                                closestDist = dist
-                                closestPlayer = hitChar
-                            end
+                        hitRegistered = true
+                        lastHitTick = tick()
+
+                        -- Bounce the attacker
+                        local bounceEvent = ReplicatedStorage:FindFirstChild("MaceBounceEvent")
+                        if bounceEvent then
+                            bounceEvent:FireClient(player)
                         end
+
+                        -- Odată ce a omorât un om în acest cadru, e de ajuns
+                        break
                     end
                 end
             end
+        end
 
-            if closestPlayer then
-                local hitHumanoid = closestPlayer:FindFirstChild("Humanoid")
-                local hitPlayer = Players:GetPlayerFromCharacter(closestPlayer)
-
-                if hitHumanoid and hitPlayer then
-                    hitHumanoid.Health = 0
-                    print(player.Name .. " l-a ucis pe " .. hitPlayer.Name .. " cu un atac mid-air!")
-
-                    -- Anulăm oprirea rundei dacă atacul a fost un succes exact în momentul aterizării
-                    if pendingLandingEnd then
-                        task.cancel(pendingLandingEnd)
-                        pendingLandingEnd = nil
-                    end
-
-                    -- The Bounce (Apply Impulse upwards)
-                    -- Am înlocuit cu un Event către client, deoarece NetworkOwnership-ul previne ApplyImpulse de pe server
-                    local bounceEvent = ReplicatedStorage:FindFirstChild("MaceBounceEvent")
-                    if bounceEvent then
-                        bounceEvent:FireClient(player)
-                    end
-
-                    -- Round continues, they can fall and hit again!
-                    isFalling = true
-                end
+        if hitRegistered then
+            -- Anulăm oprirea rundei dacă a lovit fix la aterizare
+            if pendingLandingEnd then
+                task.cancel(pendingLandingEnd)
+                pendingLandingEnd = nil
             end
-        end))
-    end
+
+            isFalling = true
+        end
+    end))
 
     -- Fail safes
     table.insert(connections, humanoid.Died:Connect(function()

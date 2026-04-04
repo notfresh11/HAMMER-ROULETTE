@@ -6,14 +6,6 @@ local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
 -- Remote Event Setup
-local eventName = "MaceAttackEvent"
-local attackEvent = ReplicatedStorage:WaitForChild(eventName, 10)
-
-if not attackEvent then
-    warn("MaceInput (Client): MaceAttackEvent nu a fost găsit în ReplicatedStorage!")
-    return
-end
-
 local bounceEventName = "MaceBounceEvent"
 local bounceEvent = ReplicatedStorage:WaitForChild(bounceEventName, 10)
 
@@ -40,28 +32,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     -- Don't process if typing in chat, etc.
     if gameProcessed then return end
 
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        local character = player.Character
-        if not character then return end
-
-        local humanoid = character:FindFirstChild("Humanoid")
-        if not humanoid then return end
-
-        -- Only trigger if the player is in the air (Freefall)
-        local state = humanoid:GetState()
-        print("MaceInput: S-a apăsat Click. Stare humanoid:", state.Name)
-        if state == Enum.HumanoidStateType.Freefall then
-            -- Optional: Verify if the tool is equipped
-            local tool = character:FindFirstChildWhichIsA("Tool")
-            if tool then
-                print("MaceInput: Echipat! Trimitem FireServer().")
-                -- Inform the server that an attack click happened
-                attackEvent:FireServer()
-            else
-                print("MaceInput: Tool-ul nu e echipat.")
-            end
-        end
-    elseif input.KeyCode == Enum.KeyCode.L then
+    if input.KeyCode == Enum.KeyCode.L then
         -- Toggle Debug Hitbox visibility
         debugHitboxVisible = not debugHitboxVisible
         print("Mace Debug Hitbox Visible:", debugHitboxVisible)
