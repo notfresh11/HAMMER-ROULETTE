@@ -7,15 +7,11 @@ local mouse = player:GetMouse()
 
 -- Remote Event Setup
 local eventName = "MaceAttackEvent"
-local attackEvent = ReplicatedStorage:FindFirstChild(eventName)
+local attackEvent = ReplicatedStorage:WaitForChild(eventName)
 
--- If the server hasn't created it yet, wait for it
 if not attackEvent then
-    attackEvent = ReplicatedStorage:WaitForChild(eventName, 10)
-    if not attackEvent then
-        warn("MaceAttackEvent nu a fost găsit în ReplicatedStorage!")
-        return
-    end
+    warn("MaceAttackEvent nu a fost găsit în ReplicatedStorage!")
+    return
 end
 
 local debugHitboxVisible = false

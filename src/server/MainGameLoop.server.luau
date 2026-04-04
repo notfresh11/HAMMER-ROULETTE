@@ -1,3 +1,13 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Create the RemoteEvent FIRST, before any scripts try to wait for it or require modules
+local maceEventName = "MaceAttackEvent"
+if not ReplicatedStorage:FindFirstChild(maceEventName) then
+    local event = Instance.new("RemoteEvent")
+    event.Name = maceEventName
+    event.Parent = ReplicatedStorage
+end
+
 local Matchmaking = require(script.Parent.modules.Matchmaking)
 local Roulette = require(script.Parent.modules.Roulette)
 local MaceMechanic = require(script.Parent.modules.MaceMechanic)
