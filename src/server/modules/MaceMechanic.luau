@@ -146,8 +146,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
             local now = tick()
             if now - lastAttackTime < ATTACK_COOLDOWN then return end
 
-            -- Must be falling
-            local inAir = (humanoid:GetState() == Enum.HumanoidStateType.Freefall)
+            -- Must be in the air (jumping or falling)
+            local inAir = (humanoid.FloorMaterial == Enum.Material.Air)
             if not inAir then return end
 
             lastAttackTime = now
@@ -165,10 +165,11 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
             local closestDist = math.huge
 
             for _, part in ipairs(partsInBox) do
-                local hitChar = part.Parent
-                if hitChar and hitChar:FindFirstChild("Humanoid") then
+                -- Part could be inside an Accessory, so we find the actual character model
+                local hitChar = part:FindFirstAncestorWhichIsA("Model")
+                if hitChar then
                     local hitHumanoid = hitChar:FindFirstChild("Humanoid")
-                    if hitHumanoid.Health > 0 then
+                    if hitHumanoid and hitHumanoid.Health > 0 then
                         local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
                         if targetRoot then
                             local dist = (rootPart.Position - targetRoot.Position).Magnitude

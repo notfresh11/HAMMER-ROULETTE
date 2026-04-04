@@ -110,34 +110,32 @@ function Roulette.playRouletteAnimation(targetPlayer)
     -- Find the 'Tip' part if it exists to precisely calculate the forward vector
     local tipPart = hammerModel:FindFirstChild("Tip", true)
 
-    local forwardVector
-    if tipPart then
-        -- The direction from the model's pivot to the Tip part
-        forwardVector = (tipPart.Position - initialPivot.Position).Unit
-        -- We only care about the X/Z plane relative direction
-        forwardVector = Vector3.new(forwardVector.X, 0, forwardVector.Z).Unit
-    end
-
-    -- For a flat-laying object, the "LookAt" logic changes.
-    -- We create a CFrame that faces the target.
+    -- We create a flat direction vector pointing towards the target player
     local dirToTarget = (Vector3.new(targetPos.X, initialPivot.Position.Y, targetPos.Z) - initialPivot.Position).Unit
+    if dirToTarget.Magnitude == 0 then dirToTarget = Vector3.new(0, 0, -1) end
 
-    local angleOffset = 0
-    if forwardVector and forwardVector.Magnitude > 0 then
-        -- Calculate the angle between the model's default local 'LookVector' (0,0,-1) and the direction to the tip
-        -- We extract the Yaw rotation offset required to align the local Z/LookVector with the Tip
-        local modelForward = initialPivot.LookVector
-        modelForward = Vector3.new(modelForward.X, 0, modelForward.Z).Unit
+    -- We calculate the exact angle to the target player in global space
+    local targetAngleGlobal = math.atan2(-dirToTarget.Z, dirToTarget.X)
 
-        -- The signed angle between model's LookVector and the Tip direction
-        angleOffset = math.atan2(modelForward.X*forwardVector.Z - modelForward.Z*forwardVector.X, modelForward.X*forwardVector.X + modelForward.Z*forwardVector.Z)
-    else
-        -- Fallback to the -90 offset if no Tip is found
-        angleOffset = math.rad(-90)
+    -- Determine how the model's 'Tip' is oriented internally
+    local internalTipOffsetAngle = math.rad(-90) -- Fallback
+    if tipPart then
+        -- Imagine the model standing at origin with no rotation. Where is the Tip?
+        -- We can find the Tip's local position relative to the model's primary pivot.
+        local localTipPos = initialPivot:ToObjectSpace(tipPart.CFrame).Position
+
+        -- Because the model is tilted 90 degrees on X *after* the yaw rotation,
+        -- its local axes are rotated. The global "Forward/Z" direction actually corresponds to the local Y-axis when lying flat.
+        -- We just extract the raw 2D angle of the tip on the model's local "floor" plane (X and Y, because it tilts down).
+        internalTipOffsetAngle = math.atan2(-localTipPos.Y, localTipPos.X)
     end
 
-    -- Apply the LookAt, then apply the calculated offset to align the tip, and THEN tilt it 90 degrees on X to lie flat.
-    local baseLookAtCFrame = CFrame.new(initialPivot.Position, Vector3.new(targetPos.X, initialPivot.Position.Y, targetPos.Z)) * CFrame.Angles(0, angleOffset, 0)
+    -- We subtract the internal offset from the desired global angle to find the exact Yaw the model must have
+    local finalYaw = targetAngleGlobal - internalTipOffsetAngle
+
+    -- Construct the final base LookAt CFrame using this absolute yaw.
+    local baseLookAtCFrame = CFrame.new(initialPivot.Position) * CFrame.Angles(0, finalYaw, 0)
+    -- Then tilt it 90 degrees to lay flat.
     local targetPivot = baseLookAtCFrame * CFrame.Angles(math.rad(90), 0, 0)
 
     local SPIN_DURATION = 3
