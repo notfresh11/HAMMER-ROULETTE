@@ -37,9 +37,27 @@ local Matchmaking = require(script.Parent.modules.Matchmaking)
 local Roulette = require(script.Parent.modules.Roulette)
 local MaceMechanic = require(script.Parent.modules.MaceMechanic)
 local MapManager = require(script.Parent.modules.MapManager)
+local DataManager = require(script.Parent.modules.DataManager)
 
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+
+-- Hook up DataManager to handle player connections
+Players.PlayerAdded:Connect(function(player)
+    DataManager.loadPlayerData(player)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    DataManager.savePlayerData(player)
+end)
+
+game:BindToClose(function()
+    print("Server shutting down. Saving all data...")
+    for _, player in ipairs(Players:GetPlayers()) do
+        DataManager.savePlayerData(player)
+    end
+end)
 
 -- Helper function to lock/unlock player movement during roulette
 local function setPlayersAnchored(playersList, isAnchored)
