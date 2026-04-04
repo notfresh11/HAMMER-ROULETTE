@@ -1,5 +1,5 @@
 local MaceMechanic = {}
-local ServerStorage = game:GetService("ServerStorage")
+local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 
 local currentTool = nil
@@ -21,14 +21,19 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
         return
     end
 
-    -- Create tool
-    local template = ServerStorage:FindFirstChild("Hammer")
-    if template then
-        local toolTemplate = template:FindFirstChild("Tool") or template
-        if toolTemplate:IsA("Tool") then
-            currentTool = toolTemplate:Clone()
-            currentTool.Parent = player.Backpack
-            humanoid:EquipTool(currentTool)
+    -- Create tool from Workspace.WholeMap.Hammer.Tool
+    local wholeMap = Workspace:WaitForChild("WholeMap", 10)
+    if wholeMap then
+        local hammerFolder = wholeMap:WaitForChild("Hammer", 10)
+        if hammerFolder then
+            local toolTemplate = hammerFolder:WaitForChild("Tool", 10)
+            if toolTemplate and toolTemplate:IsA("Tool") then
+                currentTool = toolTemplate:Clone()
+                currentTool.Parent = player.Backpack
+                humanoid:EquipTool(currentTool)
+            else
+                warn("MaceMechanic: Nu am putut găsi tool-ul în Workspace.WholeMap.Hammer.Tool!")
+            end
         end
     end
 
