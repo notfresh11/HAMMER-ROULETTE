@@ -1,5 +1,5 @@
 local MaceMechanic = {}
-local Workspace = game:GetService("Workspace")
+local ServerStorage = game:GetService("ServerStorage")
 local Players = game:GetService("Players")
 
 local currentTool = nil
@@ -21,20 +21,19 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
         return
     end
 
-    -- Create tool from Workspace.WholeMap.Hammer.Tool
-    local wholeMap = Workspace:WaitForChild("WholeMap", 10)
-    if wholeMap then
-        local hammerFolder = wholeMap:WaitForChild("Hammer", 10)
-        if hammerFolder then
-            local toolTemplate = hammerFolder:WaitForChild("Tool", 10)
-            if toolTemplate and toolTemplate:IsA("Tool") then
-                currentTool = toolTemplate:Clone()
-                currentTool.Parent = player.Backpack
-                humanoid:EquipTool(currentTool)
-            else
-                warn("MaceMechanic: Nu am putut găsi tool-ul în Workspace.WholeMap.Hammer.Tool!")
-            end
+    -- Create tool safely from ServerStorage
+    local hammerFolder = ServerStorage:WaitForChild("Hammer", 5)
+    if hammerFolder then
+        local toolTemplate = hammerFolder:WaitForChild("Tool", 5)
+        if toolTemplate and toolTemplate:IsA("Tool") then
+            currentTool = toolTemplate:Clone()
+            currentTool.Parent = player.Backpack
+            humanoid:EquipTool(currentTool)
+        else
+            warn("MaceMechanic: Nu am putut găsi tool-ul 'Tool' în ServerStorage.Hammer!")
         end
+    else
+        warn("MaceMechanic: Nu am putut găsi folderul 'Hammer' în ServerStorage!")
     end
 
     -- Boost Jump

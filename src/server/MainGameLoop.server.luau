@@ -3,6 +3,7 @@ local Roulette = require(script.Parent.modules.Roulette)
 local MaceMechanic = require(script.Parent.modules.MaceMechanic)
 
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 
 -- Function to initialize map elements (make spawns invisible)
 local function setupMap()
@@ -25,6 +26,32 @@ local function setupMap()
                 child.Anchored = true
                 child.CanCollide = false
             end
+        end
+
+        -- PREVENT VOID FALL: Anchor HammerModel exactly when the server starts
+        local hammerModel = hammerSpawn:WaitForChild("HammerModel", 10)
+        if hammerModel then
+            for _, part in ipairs(hammerModel:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Anchored = true
+                    part.CanCollide = false
+                end
+            end
+
+            -- Ensure PrimaryPart exists for rotation
+            if not hammerModel.PrimaryPart then
+                hammerModel.PrimaryPart = hammerModel:FindFirstChildWhichIsA("BasePart", true)
+            end
+
+            -- Continuous Idle Spin
+            RunService.Heartbeat:Connect(function(dt)
+                if hammerModel and hammerModel.Parent and hammerModel.PrimaryPart then
+                    -- Only spin if it isn't currently being manipulated by the Roulette logic
+                    -- The Roulette logic will quickly rotate it, so we let it overlap or we could just constantly spin it slowly
+                    local currentPivot = hammerModel:GetPivot()
+                    hammerModel:PivotTo(currentPivot * CFrame.Angles(0, math.rad(90 * dt), 0))
+                end
+            end)
         end
     end
 end
