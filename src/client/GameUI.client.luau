@@ -289,13 +289,13 @@ local function setupUI()
         local shopFrame = menus.ShopButton
 
         -- References to the internal content frames
-        local frameAbilities = shopFrame:FindFirstChild("FrameAbbillities")
+        local frameAbilities = shopFrame:FindFirstChild("FrameAbbillities") or shopFrame:FindFirstChild("FrameAbilities")
         local frameCurrency = shopFrame:FindFirstChild("FrameCurrency")
         local frameSkins = shopFrame:FindFirstChild("FrameSkins")
         local frameVFX = shopFrame:FindFirstChild("FrameVFX")
 
         -- References to the tab buttons (as seen in hierarchy, they are direct children of MainFrame)
-        local abilitiesBtn = shopFrame:FindFirstChild("AbbillitiesButton")
+        local abilitiesBtn = shopFrame:FindFirstChild("AbbillitiesButton") or shopFrame:FindFirstChild("AbilitiesButton")
         local currencyBtn = shopFrame:FindFirstChild("CurrencyButton")
         local skinsBtn = shopFrame:FindFirstChild("SkinsButton")
         local vfxBtn = shopFrame:FindFirstChild("VFXButton")
@@ -429,7 +429,7 @@ local function setupUI()
     -- Apply to shop internal buttons
     if menus.ShopButton then
         local shopFrame = menus.ShopButton
-        bindHoverAnimation(shopFrame:FindFirstChild("AbbillitiesButton"))
+        bindHoverAnimation(shopFrame:FindFirstChild("AbbillitiesButton") or shopFrame:FindFirstChild("AbilitiesButton"))
         bindHoverAnimation(shopFrame:FindFirstChild("SkinsButton"))
         bindHoverAnimation(shopFrame:FindFirstChild("VFXButton"))
         bindHoverAnimation(shopFrame:FindFirstChild("CurrencyButton"))
