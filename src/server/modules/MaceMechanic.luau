@@ -154,17 +154,29 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
 
     if attackEvent then
         table.insert(connections, attackEvent.OnServerEvent:Connect(function(plr)
-            if not roundActive or plr ~= player then return end
+            if not roundActive or plr ~= player then
+                print("Server Attack Rejected: Round not active or wrong player.")
+                return
+            end
 
             local now = tick()
-            if now - lastAttackTime < ATTACK_COOLDOWN then return end
+            if now - lastAttackTime < ATTACK_COOLDOWN then
+                print("Server Attack Rejected: Cooldown.")
+                return
+            end
 
-            -- Ne bazăm pe client că a fost în aer, dar validăm și pe server
-            -- Dacă clientul a trimis atacul, dar pe server a aterizat exact în același moment, îl permitem (prin grace period).
-            local inAir = (humanoid.FloorMaterial == Enum.Material.Air)
-            if not inAir and not pendingLandingEnd then return end
+            -- Validare relaxată: Clientul e de încredere pentru aer (din scriptul local)
+            -- Dar pe server, permitem lovitura dacă starea curentă e Freefall SAU suntem în "grace period" (abia a aterizat)
+            local currentState = humanoid:GetState()
+            local inAirState = (currentState == Enum.HumanoidStateType.Freefall)
+
+            if not inAirState and not pendingLandingEnd then
+                print("Server Attack Rejected: Not in air and no grace period. State:", currentState.Name)
+                return
+            end
 
             lastAttackTime = now
+            print("Server Attack Validated! Checking for targets...")
 
             local boxSize = hitboxPart.Size
             local boxCFrame = hitboxPart.CFrame
@@ -174,6 +186,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
             overlapParams.FilterDescendantsInstances = {character}
 
             local partsInBox = Workspace:GetPartBoundsInBox(boxCFrame, boxSize, overlapParams)
+            print("Părți găsite în hitbox:", #partsInBox)
 
             local closestPlayer = nil
             local closestDist = math.huge
