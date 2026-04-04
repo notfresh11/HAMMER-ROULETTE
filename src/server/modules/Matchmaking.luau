@@ -69,7 +69,7 @@ function Matchmaking.teleportPlayersToSpawns(activePlayers, currentMapInstance)
     if currentMapInstance then
         local spawnFolder = currentMapInstance:FindFirstChild("PlayerSpawn")
         if spawnFolder then
-            for _, part in ipairs(spawnFolder:GetChildren()) do
+            for _, part in ipairs(spawnFolder:GetDescendants()) do
                 if part:IsA("BasePart") then
                     table.insert(spawns, part)
                 end
