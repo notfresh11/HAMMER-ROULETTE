@@ -25,8 +25,8 @@ function Matchmaking.waitForPlayers()
     return true
 end
 
-function Matchmaking.teleportPlayersToSpawns()
-    print("Matchmaking: Teleportăm jucătorii...")
+function Matchmaking.teleportPlayersToSpawns(activePlayers)
+    print("Matchmaking: Teleportăm jucătorii supraviețuitori...")
     -- Use the exact folder name from the screenshot: "PlayerSpawn"
     local spawnFolder = Workspace:WaitForChild("PlayerSpawn", 10)
     local spawns = {}
@@ -41,20 +41,22 @@ function Matchmaking.teleportPlayersToSpawns()
         warn("Eroare: Nu am găsit folderul PlayerSpawn în Workspace!")
     end
 
-    local currentPlayers = Players:GetPlayers()
-    for index, player in ipairs(currentPlayers) do
-        local character = player.Character
-        if character and character:FindFirstChild("HumanoidRootPart") then
-            local spawnPos = Vector3.new(0, 50, 0) -- fallback
-            if #spawns > 0 then
-                -- Round robin assign spawns
-                local spawnIndex = ((index - 1) % #spawns) + 1
-                spawnPos = spawns[spawnIndex].Position + Vector3.new(0, 5, 0)
-            else
-                spawnPos = Vector3.new((index - 1) * 5, 50, 0)
-            end
+    for index, player in ipairs(activePlayers) do
+        -- Only teleport if they are actually in game and alive
+        if player and player.Parent == Players then
+            local character = player.Character
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                local spawnPos = Vector3.new(0, 50, 0) -- fallback
+                if #spawns > 0 then
+                    -- Round robin assign spawns
+                    local spawnIndex = ((index - 1) % #spawns) + 1
+                    spawnPos = spawns[spawnIndex].Position + Vector3.new(0, 5, 0)
+                else
+                    spawnPos = Vector3.new((index - 1) * 5, 50, 0)
+                end
 
-            character.HumanoidRootPart.CFrame = CFrame.new(spawnPos)
+                character.HumanoidRootPart.CFrame = CFrame.new(spawnPos)
+            end
         end
     end
 end
