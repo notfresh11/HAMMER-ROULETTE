@@ -107,14 +107,18 @@ function Roulette.playRouletteAnimation(targetPlayer)
         targetPos = targetPlayer.Character.HumanoidRootPart.Position
     end
 
-    local targetPivot = CFrame.new(initialPivot.Position, Vector3.new(targetPos.X, initialPivot.Position.Y, targetPos.Z))
+    -- For a flat-laying object, the "LookAt" logic changes.
+    -- We create a CFrame that faces the target, and THEN tilt it 90 degrees on X to lie flat.
+    local baseLookAtCFrame = CFrame.new(initialPivot.Position, Vector3.new(targetPos.X, initialPivot.Position.Y, targetPos.Z))
+    local targetPivot = baseLookAtCFrame * CFrame.Angles(math.rad(90), 0, 0)
 
     local SPIN_DURATION = 3
     local startTime = tick()
 
-    -- We want it to spin fast then slow down, landing on the player.
-    local _, startYaw, _ = initialPivot:ToEulerAnglesYXZ()
-    local _, targetYaw, _ = targetPivot:ToEulerAnglesYXZ()
+    -- Extract the Z-axis rotation (spin on the ground) from the initial and target CFrames
+    -- Because it's tilted 90deg on X, "yaw" is now effectively the Z axis relative to local space
+    local _, startYaw, _ = (initialPivot * CFrame.Angles(math.rad(-90), 0, 0)):ToEulerAnglesYXZ()
+    local _, targetYaw, _ = baseLookAtCFrame:ToEulerAnglesYXZ()
     local yawDiff = (targetYaw - startYaw + math.pi) % (2 * math.pi) - math.pi
     local totalSpins = 5
     local totalYawToTravel = yawDiff + (math.pi * 2 * totalSpins)
@@ -134,13 +138,15 @@ function Roulette.playRouletteAnimation(targetPlayer)
             else
                 hammerModel.CFrame = targetPivot
             end
-            -- Allow idle spinner to resume (it won't immediately rotate visually back, it will resume smoothly from where we left it)
+            -- Allow idle spinner to resume
             hammerModel:SetAttribute("IsRoulette", false)
             return
         end
 
-        local currentYaw = totalYawToTravel * easeOutAlpha
-        local finalPivot = initialPivot * CFrame.Angles(0, currentYaw, 0)
+        local currentYaw = startYaw + (totalYawToTravel * easeOutAlpha)
+
+        -- Build the CFrame: Start at position, apply yaw rotation, then tilt 90deg to lie flat
+        local finalPivot = CFrame.new(initialPivot.Position) * CFrame.Angles(0, currentYaw, 0) * CFrame.Angles(math.rad(90), 0, 0)
 
         -- To prevent fighting with the idle animation, we override its CFrame entirely here
         if isModel then
