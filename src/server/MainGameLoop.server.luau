@@ -15,6 +15,16 @@ if not ReplicatedStorage:FindFirstChild(maceBounceEventName) then
     event.Parent = ReplicatedStorage
 end
 
+-- UI Events
+local uiEvents = {"ShowCountdownEvent", "ShowTextEvent", "HideTextEvent"}
+for _, evName in ipairs(uiEvents) do
+    if not ReplicatedStorage:FindFirstChild(evName) then
+        local ev = Instance.new("RemoteEvent")
+        ev.Name = evName
+        ev.Parent = ReplicatedStorage
+    end
+end
+
 local Matchmaking = require(script.Parent.modules.Matchmaking)
 local Roulette = require(script.Parent.modules.Roulette)
 local MaceMechanic = require(script.Parent.modules.MaceMechanic)

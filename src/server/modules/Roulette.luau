@@ -2,6 +2,7 @@ local Roulette = {}
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local playerWeights = {}
 
@@ -141,6 +142,25 @@ function Roulette.playRouletteAnimation(targetPlayer)
     local SPIN_DURATION = 3
     local startTime = tick()
 
+    -- UI Setup
+    local showCountdownEvent = ReplicatedStorage:WaitForChild("ShowCountdownEvent")
+    local showTextEvent = ReplicatedStorage:WaitForChild("ShowTextEvent")
+    local hideTextEvent = ReplicatedStorage:WaitForChild("HideTextEvent")
+    local COUNTDOWN_SOUND = "rbxassetid://110001162763213"
+    local START_SOUND = "rbxassetid://77736543307386"
+
+    -- Countdown loop for the Roulette
+    task.spawn(function()
+        for i = SPIN_DURATION, 1, -1 do
+            local color = Color3.new(1, 0, 0)
+            if i == 2 then color = Color3.new(1, 1, 0)
+            elseif i == 1 then color = Color3.new(0, 1, 0) end
+
+            showCountdownEvent:FireAllClients(i, color, COUNTDOWN_SOUND)
+            task.wait(1)
+        end
+    end)
+
     -- Extract the Z-axis rotation (spin on the ground) from the initial and target CFrames
     -- Because it's tilted 90deg on X, "yaw" is now effectively the Z axis relative to local space
     local _, startYaw, _ = (initialPivot * CFrame.Angles(math.rad(-90), 0, 0)):ToEulerAnglesYXZ()
@@ -184,6 +204,12 @@ function Roulette.playRouletteAnimation(targetPlayer)
     end)
 
     task.wait(SPIN_DURATION)
+
+    -- Finalize UI
+    showTextEvent:FireAllClients("Player has the Mace !", Color3.new(0, 1, 0), START_SOUND)
+    task.delay(2, function()
+        hideTextEvent:FireAllClients()
+    end)
 end
 
 return Roulette
