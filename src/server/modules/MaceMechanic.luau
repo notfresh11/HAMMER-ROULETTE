@@ -28,15 +28,10 @@ local function createDebugHitbox(cframe, size)
 end
 
 -- Create or get the RemoteEvent for the MaceAttack
+-- Get the RemoteEvent created by MainGameLoop
 local maceEventName = "MaceAttackEvent"
-local attackEvent = ReplicatedStorage:FindFirstChild(maceEventName)
-if not attackEvent then
-    attackEvent = Instance.new("RemoteEvent")
-    attackEvent.Name = maceEventName
-    attackEvent.Parent = ReplicatedStorage
-end
+local attackEvent = ReplicatedStorage:WaitForChild(maceEventName)
 
--- Listen for attacks from the client
 function MaceMechanic.startMechanic(player, onRoundEndCallback)
     roundActive = true
     local character = player.Character
