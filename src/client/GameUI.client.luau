@@ -32,8 +32,8 @@ local function playSoundIsolated(soundId)
     newSound.SoundId = soundId
     newSound.Parent = screenGui
 
-    -- Am scos TimePosition = 0.25 pentru că tăia sunetul complet.
-    -- Dacă e un mic delay e din cauza felului în care e encodat asset-ul MP3/OGG de pe Roblox.
+    -- Un trim foarte mic pentru a elimina delay-ul scurt fără să taie sunetul
+    newSound.TimePosition = 0.05
 
     -- Distrugem sunetul după ce se termină de redat
     newSound.Ended:Connect(function()
@@ -86,13 +86,8 @@ if mainUI then
     local toggleAfkEvent = ReplicatedStorage:WaitForChild("ToggleAFKEvent")
 
     if afkButton then
-        local yesAfkImg = afkButton:FindFirstChild("YesAFK")
-        local noAfkImg = afkButton:FindFirstChild("NoAFK")
         local afkTextLabel = afkButton:FindFirstChild("TextLabel")
 
-        -- Setup default state (Not AFK)
-        if yesAfkImg then yesAfkImg.Visible = false end
-        if noAfkImg then noAfkImg.Visible = true end
         local originalFont = Font.new("rbxassetid://12187371840")
 
         if afkTextLabel then
@@ -121,10 +116,6 @@ if mainUI then
         afkButton.MouseButton1Click:Connect(function()
             playSoundIsolated(clickSoundId)
             isAFK = not isAFK
-
-            -- Update Images (Standard logic: YesAFK visible when IS AFK, NoAFK visible when NOT AFK)
-            if yesAfkImg then yesAfkImg.Visible = isAFK end
-            if noAfkImg then noAfkImg.Visible = not isAFK end
 
             -- Update Background Color of the button itself
             if isAFK then
@@ -297,6 +288,13 @@ local showCountdown = ReplicatedStorage:WaitForChild("ShowCountdownEvent", 10)
 local showText = ReplicatedStorage:WaitForChild("ShowTextEvent", 10)
 local hideText = ReplicatedStorage:WaitForChild("HideTextEvent", 10)
 local vfxEvent = ReplicatedStorage:WaitForChild("VfxEvent", 10)
+local toggleMainUiEvent = ReplicatedStorage:WaitForChild("ToggleMainUIEvent", 10)
+
+if toggleMainUiEvent and mainUI then
+    toggleMainUiEvent.OnClientEvent:Connect(function(isVisible)
+        mainUI.Enabled = isVisible
+    end)
+end
 
 -- Funcție Helper VFX Client
 local function runClientVfx(victimPos, victimColors)
