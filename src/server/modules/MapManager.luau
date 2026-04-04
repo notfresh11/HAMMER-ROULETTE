@@ -23,26 +23,39 @@ function MapManager.hideAllMaps()
     -- Muta HammerModel în MapStorage
     local hammerModelFolder = ServerStorage:FindFirstChild("HammerModel")
     if hammerModelFolder then
-        -- Dacă este folder (cum ai în poză), vrem să scoatem fix Modelul de ciocan din el
         if hammerModelFolder:IsA("Folder") then
             local actualModel = hammerModelFolder:FindFirstChild("HammerModel") or hammerModelFolder:FindFirstChildWhichIsA("Model")
             if actualModel then
+                -- Move the actual model out
                 actualModel.Parent = mapStorage
-                actualModel.Name = "HammerModel" -- Standardizăm numele
-                hammerModelFolder:Destroy()
-            else
-                -- Dacă nu găsim un Model, mutăm folderul cumva convertit
-                local hm = Instance.new("Model")
-                hm.Name = "HammerModel"
-                local unionPart = nil
-                for _, d in ipairs(hammerModelFolder:GetChildren()) do
-                    d.Parent = hm
-                    if d:IsA("UnionOperation") or d.Name == "Union" then
-                        unionPart = d
+                actualModel.Name = "HammerModel"
+
+                -- Crucial fix: The 'Tip' part might be inside the Folder, but outside the Model!
+                -- We must ensure the Tip part (and any other stragglers like welds) are moved inside the actualModel
+                local childrenToMove = hammerModelFolder:GetChildren()
+                for _, child in ipairs(childrenToMove) do
+                    if child ~= actualModel then
+                        child.Parent = actualModel
                     end
                 end
 
-                if unionPart then
+                hammerModelFolder:Destroy()
+            else
+                -- If no Model exists, create one and reparent everything
+                local hm = Instance.new("Model")
+                hm.Name = "HammerModel"
+
+                local unionPart = nil
+                local childrenToMove = hammerModelFolder:GetChildren()
+
+                for _, child in ipairs(childrenToMove) do
+                    child.Parent = hm
+                    if child:IsA("UnionOperation") or child.Name == "Union" or child.Name == "HammerModel" then
+                        unionPart = child
+                    end
+                end
+
+                if unionPart and unionPart:IsA("BasePart") then
                     hm.PrimaryPart = unionPart
                 else
                     hm.PrimaryPart = hm:FindFirstChildWhichIsA("BasePart")
@@ -198,13 +211,14 @@ function MapManager.chooseAndSpawnMap()
             end
             if currentHammerInstance.PrimaryPart then
                 -- Try to use size from union if it's the primary part, fallback to size Y or Z based on standard orientation
-                hammerHeight = currentHammerInstance.PrimaryPart.Size.Y / 2
+                -- Since we rotate 90 degrees on X, the local Z axis determines the thickness vertically
+                hammerHeight = currentHammerInstance.PrimaryPart.Size.Z / 2
             end
         else
             currentHammerInstance.Anchored = true
             currentHammerInstance.CanCollide = false
             if currentHammerInstance:IsA("BasePart") then
-                hammerHeight = currentHammerInstance.Size.Y / 2
+                hammerHeight = currentHammerInstance.Size.Z / 2
             end
         end
 
