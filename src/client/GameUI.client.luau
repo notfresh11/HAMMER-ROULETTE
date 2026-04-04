@@ -55,6 +55,11 @@ local TweenService = game:GetService("TweenService")
 -- === GUI INTERACTION LOGIC ===
 local mainUI = playerGui:WaitForChild("MAINUI", 5)
 if mainUI then
+    -- Fix UI being pushed down by the topbar
+    if mainUI:IsA("ScreenGui") then
+        mainUI.IgnoreGuiInset = true
+    end
+
     local clickSoundId = "rbxassetid://124476359159008"
 
     -- Fetching the components based on the user's hierarchy
@@ -162,7 +167,7 @@ if mainUI then
         end)
     end
 
-    -- Menu Toggling Logic
+    -- Menu Toggling Logic and Cache Sizes for Pop-up Animation
     local menus = {
         ShopButton = shopGui and shopGui:FindFirstChild("MainFrame"),
         QuestsButton = questsGui and questsGui:FindFirstChild("MainFrame"),
@@ -170,6 +175,18 @@ if mainUI then
         SettingsButton = settingsGui and settingsGui:FindFirstChild("MainFrame"),
         DiscordButton = discordGui and discordGui:FindFirstChild("MainFrame")
     }
+
+    local originalMenuSizes = {}
+    for name, frame in pairs(menus) do
+        if frame then
+            originalMenuSizes[name] = frame.Size
+            -- We also set the AnchorPoint to center for all menus so scaling from 0 looks like a pop-out
+            -- Note: If this breaks their position, user might need to center them properly in Studio.
+            frame.AnchorPoint = Vector2.new(0.5, 0.5)
+            -- Position adjustments might be needed depending on how the user built them,
+            -- but mostly anchor 0.5 makes size tweens grow from center.
+        end
+    end
 
     local function hideAllMenus()
         for _, frame in pairs(menus) do
@@ -179,9 +196,15 @@ if mainUI then
         end
     end
 
+    -- Ascunde toate meniurile automat cand intri pe joc pentru a nu te bombarda pe ecran
+    hideAllMenus()
+
     -- Assign logic to buttons
+    local cornerButtonsFolder = mainUI:FindFirstChild("CornerButtons")
+
     for buttonName, targetFrame in pairs(menus) do
-        local button = mainUI:FindFirstChild(buttonName)
+        -- Check both MAINUI and CornerButtons folder
+        local button = mainUI:FindFirstChild(buttonName) or (cornerButtonsFolder and cornerButtonsFolder:FindFirstChild(buttonName))
         if button then
             button.MouseButton1Click:Connect(function()
                 playSoundIsolated(clickSoundId)
@@ -192,12 +215,24 @@ if mainUI then
 
                 if targetFrame and not wasVisible then
                     targetFrame.Visible = true
+
+                    -- Pop-up Animation
+                    local originalSize = originalMenuSizes[buttonName]
+                    if originalSize then
+                        -- Start small
+                        targetFrame.Size = UDim2.new(0, 0, 0, 0)
+
+                        -- Tween back to original size with bounce
+                        local tweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out)
+                        local tween = TweenService:Create(targetFrame, tweenInfo, {Size = originalSize})
+                        tween:Play()
+                    end
                 end
             end)
         end
     end
 
-    -- Hover Animations for all text/image buttons in MAINUI
+    -- Hover Animations for standard buttons (Scale Up)
     for _, child in ipairs(mainUI:GetChildren()) do
         if child:IsA("GuiButton") then
             local originalSize = child.Size
@@ -215,6 +250,43 @@ if mainUI then
                 local tween = TweenService:Create(child, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = originalSize})
                 tween:Play()
             end)
+        end
+    end
+
+    -- Hover Animations for CornerButtons (Darken Background/Image)
+    if cornerButtonsFolder then
+        for _, button in ipairs(cornerButtonsFolder:GetChildren()) do
+            if button:IsA("GuiButton") then
+                -- Assuming user used UI elements with colors, we target Text/Image buttons specifically.
+                -- Darken the general Background if they use that, or TextColor
+                local originalColor = button.BackgroundColor3
+                local hoverColor = Color3.new(originalColor.R * 0.7, originalColor.G * 0.7, originalColor.B * 0.7)
+
+                button.MouseEnter:Connect(function()
+                    local tween = TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Linear), {BackgroundColor3 = hoverColor})
+                    tween:Play()
+                end)
+
+                button.MouseLeave:Connect(function()
+                    local tween = TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Linear), {BackgroundColor3 = originalColor})
+                    tween:Play()
+                end)
+
+                -- Also tween any ImageLabels inside it if they have images that act as icons
+                for _, icon in ipairs(button:GetChildren()) do
+                    if icon:IsA("ImageLabel") or icon:IsA("ImageButton") then
+                        local origImgColor = icon.ImageColor3
+                        local hoverImgColor = Color3.new(origImgColor.R * 0.7, origImgColor.G * 0.7, origImgColor.B * 0.7)
+
+                        button.MouseEnter:Connect(function()
+                            TweenService:Create(icon, TweenInfo.new(0.15, Enum.EasingStyle.Linear), {ImageColor3 = hoverImgColor}):Play()
+                        end)
+                        button.MouseLeave:Connect(function()
+                            TweenService:Create(icon, TweenInfo.new(0.15, Enum.EasingStyle.Linear), {ImageColor3 = origImgColor}):Play()
+                        end)
+                    end
+                end
+            end
         end
     end
 end
