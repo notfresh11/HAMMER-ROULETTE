@@ -287,17 +287,35 @@ local function setupUI()
     -- ===========================
     if menus.ShopButton then
         local shopFrame = menus.ShopButton
-        local pageButtonsContainer = shopFrame:FindFirstChild("PageButtons")
 
-        local currencyFrame = shopFrame:FindFirstChild("Currency")
-        local skinsFrame = shopFrame:FindFirstChild("Skins")
+        -- References to the internal content frames
+        local frameAbilities = shopFrame:FindFirstChild("FrameAbilities")
+        local frameCurrency = shopFrame:FindFirstChild("FrameCurrency")
+        local frameSkins = shopFrame:FindFirstChild("FrameSkins")
+        local frameVFX = shopFrame:FindFirstChild("FrameVFX")
 
-        -- Default to Currency visible
-        if currencyFrame then currencyFrame.Visible = true end
-        if skinsFrame then skinsFrame.Visible = false end
+        -- References to the tab buttons (as seen in hierarchy, they are direct children of MainFrame)
+        local abilitiesBtn = shopFrame:FindFirstChild("AbilitiesButton")
+        local currencyBtn = shopFrame:FindFirstChild("CurrencyButton")
+        local skinsBtn = shopFrame:FindFirstChild("SkinsButton")
+        local vfxBtn = shopFrame:FindFirstChild("VFXButton")
 
-        local currencyBtn = pageButtonsContainer and pageButtonsContainer:FindFirstChild("Currency")
-        local exitBtn = currencyBtn and currencyBtn:FindFirstChild("ExitButton")
+        -- Ref to the Exit Button
+        local exitBtn = nil
+        if currencyBtn then
+            exitBtn = currencyBtn:FindFirstChild("ExitButton")
+        end
+
+        -- Default State: Only Currency visible
+        local function resetShopTabs()
+            if frameAbilities then frameAbilities.Visible = false end
+            if frameCurrency then frameCurrency.Visible = true end
+            if frameSkins then frameSkins.Visible = false end
+            if frameVFX then frameVFX.Visible = false end
+        end
+
+        -- Call reset to set default state immediately
+        resetShopTabs()
 
         -- Logic for Exit Button
         if exitBtn then
@@ -305,84 +323,116 @@ local function setupUI()
                 playSoundIsolated(clickSoundId)
                 shopFrame.Visible = false
             end))
+        end
 
-            -- Exit button hover animation
-            local origSize = exitBtn.Size
-            local hoverSize = UDim2.new(
-                origSize.X.Scale * 1.1, origSize.X.Offset * 1.1,
-                origSize.Y.Scale * 1.1, origSize.Y.Offset * 1.1
-            )
-            table.insert(activeConnections, exitBtn.MouseEnter:Connect(function()
-                TweenService:Create(exitBtn, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = hoverSize}):Play()
-            end))
-            table.insert(activeConnections, exitBtn.MouseLeave:Connect(function()
-                TweenService:Create(exitBtn, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = origSize}):Play()
+        -- Helper to switch tabs
+        local function showShopTab(tabName)
+            if frameAbilities then frameAbilities.Visible = (tabName == "Abilities") end
+            if frameCurrency then frameCurrency.Visible = (tabName == "Currency") end
+            if frameSkins then frameSkins.Visible = (tabName == "Skins") end
+            if frameVFX then frameVFX.Visible = (tabName == "VFX") end
+        end
+
+        -- Bind tab buttons
+        if abilitiesBtn then
+            table.insert(activeConnections, abilitiesBtn.MouseButton1Click:Connect(function()
+                playSoundIsolated(clickSoundId)
+                showShopTab("Abilities")
             end))
         end
 
-        -- Logic for Internal Tabs (Currency vs Skins)
-        if pageButtonsContainer then
-            local skinsBtn = pageButtonsContainer:FindFirstChild("Skins")
+        if skinsBtn then
+            table.insert(activeConnections, skinsBtn.MouseButton1Click:Connect(function()
+                playSoundIsolated(clickSoundId)
+                showShopTab("Skins")
+            end))
+        end
 
-            local function showShopTab(tabName)
-                if currencyFrame then currencyFrame.Visible = (tabName == "Currency") end
-                if skinsFrame then skinsFrame.Visible = (tabName == "Skins") end
-            end
+        if vfxBtn then
+            table.insert(activeConnections, vfxBtn.MouseButton1Click:Connect(function()
+                playSoundIsolated(clickSoundId)
+                showShopTab("VFX")
+            end))
+        end
 
-            if currencyBtn then
-                table.insert(activeConnections, currencyBtn.MouseButton1Click:Connect(function()
-                    playSoundIsolated(clickSoundId)
-                    showShopTab("Currency")
-                end))
-
-                -- Hover animation for internal tab button
-                local origColor = currencyBtn.BackgroundColor3
-                local hoverColor = Color3.new(origColor.R * 0.8, origColor.G * 0.8, origColor.B * 0.8)
-                table.insert(activeConnections, currencyBtn.MouseEnter:Connect(function()
-                    TweenService:Create(currencyBtn, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
-                end))
-                table.insert(activeConnections, currencyBtn.MouseLeave:Connect(function()
-                    TweenService:Create(currencyBtn, TweenInfo.new(0.15), {BackgroundColor3 = origColor}):Play()
-                end))
-            end
-
-            if skinsBtn then
-                table.insert(activeConnections, skinsBtn.MouseButton1Click:Connect(function()
-                    playSoundIsolated(clickSoundId)
-                    showShopTab("Skins")
-                end))
-
-                -- Hover animation for internal tab button
-                local origColor = skinsBtn.BackgroundColor3
-                local hoverColor = Color3.new(origColor.R * 0.8, origColor.G * 0.8, origColor.B * 0.8)
-                table.insert(activeConnections, skinsBtn.MouseEnter:Connect(function()
-                    TweenService:Create(skinsBtn, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
-                end))
-                table.insert(activeConnections, skinsBtn.MouseLeave:Connect(function()
-                    TweenService:Create(skinsBtn, TweenInfo.new(0.15), {BackgroundColor3 = origColor}):Play()
-                end))
-            end
+        if currencyBtn then
+            table.insert(activeConnections, currencyBtn.MouseButton1Click:Connect(function()
+                playSoundIsolated(clickSoundId)
+                showShopTab("Currency")
+            end))
         end
     end
 
     -- Hover Animations for standard buttons (Scale Up)
-    for _, child in ipairs(mainUI:GetChildren()) do
-        if child:IsA("GuiButton") then
-            local originalSize = child.Size
-            local targetSize = UDim2.new(
-                originalSize.X.Scale * 1.1, originalSize.X.Offset * 1.1,
-                originalSize.Y.Scale * 1.1, originalSize.Y.Offset * 1.1
+    -- We define a helper function to bind scale animations to any button
+    local function bindHoverAnimation(button)
+        if not button or not button:IsA("GuiObject") then return end
+
+        -- Store initial size as attributes to prevent size degradation if hovered during tween interruptions
+        if not button:GetAttribute("OrigSizeXScale") then
+            button:SetAttribute("OrigSizeXScale", button.Size.X.Scale)
+            button:SetAttribute("OrigSizeXOffset", button.Size.X.Offset)
+            button:SetAttribute("OrigSizeYScale", button.Size.Y.Scale)
+            button:SetAttribute("OrigSizeYOffset", button.Size.Y.Offset)
+        end
+
+        local originalSize = UDim2.new(
+            button:GetAttribute("OrigSizeXScale"),
+            button:GetAttribute("OrigSizeXOffset"),
+            button:GetAttribute("OrigSizeYScale"),
+            button:GetAttribute("OrigSizeYOffset")
+        )
+
+        local targetSize = UDim2.new(
+            originalSize.X.Scale * 1.05, originalSize.X.Offset * 1.05,
+            originalSize.Y.Scale * 1.05, originalSize.Y.Offset * 1.05
+        )
+
+        -- If it's a click button, also add a click "squish" effect
+        if button:IsA("GuiButton") then
+            local clickSize = UDim2.new(
+                originalSize.X.Scale * 0.95, originalSize.X.Offset * 0.95,
+                originalSize.Y.Scale * 0.95, originalSize.Y.Offset * 0.95
             )
 
-            table.insert(activeConnections, child.MouseEnter:Connect(function()
-                local tween = TweenService:Create(child, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize})
-                tween:Play()
+            table.insert(activeConnections, button.MouseButton1Down:Connect(function()
+                TweenService:Create(button, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = clickSize}):Play()
             end))
+            table.insert(activeConnections, button.MouseButton1Up:Connect(function()
+                TweenService:Create(button, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
+            end))
+        end
 
-            table.insert(activeConnections, child.MouseLeave:Connect(function()
-                local tween = TweenService:Create(child, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = originalSize})
-                tween:Play()
-            end))
+        table.insert(activeConnections, button.MouseEnter:Connect(function()
+            local tween = TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize})
+            tween:Play()
+        end))
+
+        table.insert(activeConnections, button.MouseLeave:Connect(function()
+            local tween = TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = originalSize})
+            tween:Play()
+        end))
+    end
+
+    -- Apply to standard main buttons
+    for _, child in ipairs(mainUI:GetChildren()) do
+        if child:IsA("GuiButton") then
+            bindHoverAnimation(child)
+        end
+    end
+
+    -- Apply to shop internal buttons
+    if menus.ShopButton then
+        local shopFrame = menus.ShopButton
+        bindHoverAnimation(shopFrame:FindFirstChild("AbilitiesButton"))
+        bindHoverAnimation(shopFrame:FindFirstChild("SkinsButton"))
+        bindHoverAnimation(shopFrame:FindFirstChild("VFXButton"))
+        bindHoverAnimation(shopFrame:FindFirstChild("CurrencyButton"))
+        bindHoverAnimation(shopFrame:FindFirstChild("CoinsButton"))
+
+        local cBtn = shopFrame:FindFirstChild("CurrencyButton")
+        if cBtn then
+            bindHoverAnimation(cBtn:FindFirstChild("ExitButton"))
         end
     end
 
