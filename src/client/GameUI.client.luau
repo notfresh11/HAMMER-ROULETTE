@@ -54,8 +54,12 @@ end
 local TweenService = game:GetService("TweenService")
 
 -- === GUI INTERACTION LOGIC ===
-local mainUI = playerGui:WaitForChild("MAINUI")
-if mainUI then
+local isAFK = false -- State-ul AFK trebuie să fie persistent
+
+local function setupUI()
+    local mainUI = playerGui:WaitForChild("MAINUI")
+    if not mainUI then return end
+
     -- Fix UI being pushed down by the topbar
     if mainUI:IsA("ScreenGui") then
         mainUI.IgnoreGuiInset = true
@@ -64,7 +68,6 @@ if mainUI then
     local clickSoundId = "rbxassetid://124476359159008"
 
     -- Fetching the components based on the user's hierarchy
-    -- Am scos limitele de timp (5 secunde) pentru a aștepta interfața oricât e nevoie.
     local questsGui = playerGui:WaitForChild("Quests")
     local discordGui = playerGui:WaitForChild("Discord")
     local statsGui = playerGui:WaitForChild("Stats")
@@ -72,17 +75,14 @@ if mainUI then
     local settingsGui = playerGui:WaitForChild("Settings")
 
     -- Force Enable all root ScreenGuis in case user disabled them in Studio to save space
-    -- AND ensure they do not reset on spawn, so our script references don't break when players die
-    if mainUI and mainUI:IsA("ScreenGui") then mainUI.ResetOnSpawn = false end
-    if questsGui then questsGui.Enabled = true; questsGui.ResetOnSpawn = false end
-    if discordGui then discordGui.Enabled = true; discordGui.ResetOnSpawn = false end
-    if statsGui then statsGui.Enabled = true; statsGui.ResetOnSpawn = false end
-    if shopGui then shopGui.Enabled = true; shopGui.ResetOnSpawn = false end
-    if settingsGui then settingsGui.Enabled = true; settingsGui.ResetOnSpawn = false end
+    if questsGui then questsGui.Enabled = true end
+    if discordGui then discordGui.Enabled = true end
+    if statsGui then statsGui.Enabled = true end
+    if shopGui then shopGui.Enabled = true end
+    if settingsGui then settingsGui.Enabled = true end
 
     -- AFK Component Setup
     local afkButton = mainUI:FindFirstChild("AFKButton")
-    local isAFK = false
     local afkTextFadeTween = nil
     local afkDelayThread = nil
 
@@ -90,32 +90,37 @@ if mainUI then
     local toggleAfkEvent = ReplicatedStorage:WaitForChild("ToggleAFKEvent")
 
     if afkButton then
-        local afkTextLabel = afkButton:FindFirstChild("TextLabel")
+        -- Find existing notification or create new one
+        local afkTextLabel = screenGui:FindFirstChild("AFKNotificationText")
 
         local originalFont = Font.new("rbxassetid://12187371840")
-
-        if afkTextLabel then
-            -- Salvează fontul original setat de tine din Studio
-            originalFont = afkTextLabel.FontFace
-            -- Destroy the Studio-bound text label that might have constraints attached to it
-            afkTextLabel:Destroy()
+        local oldStudioText = afkButton:FindFirstChild("TextLabel")
+        if oldStudioText then
+            originalFont = oldStudioText.FontFace
+            oldStudioText:Destroy()
         end
 
-        -- Create a brand new TextLabel explicitly to guarantee it ignores all MAINUI constraints
-        afkTextLabel = Instance.new("TextLabel")
-        afkTextLabel.Name = "AFKNotificationText"
-        afkTextLabel.Parent = screenGui
-        afkTextLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-        afkTextLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
-        afkTextLabel.Size = UDim2.new(0.5, 0, 0.2, 0)
-        afkTextLabel.BackgroundTransparency = 1
-        afkTextLabel.TextScaled = true
-        afkTextLabel.FontFace = originalFont
-        afkTextLabel.TextTransparency = 1
-        afkTextLabel.TextStrokeTransparency = 1
+        if not afkTextLabel then
+            -- Create a brand new TextLabel explicitly to guarantee it ignores all MAINUI constraints
+            afkTextLabel = Instance.new("TextLabel")
+            afkTextLabel.Name = "AFKNotificationText"
+            afkTextLabel.Parent = screenGui
+            afkTextLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+            afkTextLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+            afkTextLabel.Size = UDim2.new(0.5, 0, 0.2, 0)
+            afkTextLabel.BackgroundTransparency = 1
+            afkTextLabel.TextScaled = true
+            afkTextLabel.FontFace = originalFont
+            afkTextLabel.TextTransparency = 1
+            afkTextLabel.TextStrokeTransparency = 1
+        end
 
-        -- Make sure default color matches default state (NOAFK = Red)
-        afkButton.BackgroundColor3 = Color3.new(1, 0, 0)
+        -- Make sure default color matches current persistent state
+        if isAFK then
+            afkButton.BackgroundColor3 = Color3.new(0, 1, 0) -- Green
+        else
+            afkButton.BackgroundColor3 = Color3.new(1, 0, 0) -- Red
+        end
 
         afkButton.MouseButton1Click:Connect(function()
             playSoundIsolated(clickSoundId)
@@ -183,14 +188,21 @@ if mainUI then
         end
     end
 
-    -- Ascunde toate meniurile automat cand intri pe joc pentru a nu te bombarda pe ecran
+    -- Ascunde toate meniurile automat cand interfața se inițializează pentru a nu te bombarda pe ecran
     hideAllMenus()
 
+    -- Curățăm event-ul vechi dacă există, altfel se adună multiple triggere la fiecare moarte
+    if _G.ToggleMainUIConnection then
+        _G.ToggleMainUIConnection:Disconnect()
+        _G.ToggleMainUIConnection = nil
+    end
+
     local toggleMainUiEvent = ReplicatedStorage:WaitForChild("ToggleMainUIEvent", 10)
-    -- Când intrăm în meci, pe lângă ascunderea MAINUI, închidem forțat și orice meniu rămas deschis (cum ar fi Quests)
     if toggleMainUiEvent then
-        toggleMainUiEvent.OnClientEvent:Connect(function(isVisible)
-            mainUI.Enabled = isVisible
+        _G.ToggleMainUIConnection = toggleMainUiEvent.OnClientEvent:Connect(function(isVisible)
+            if mainUI and mainUI.Parent then
+                mainUI.Enabled = isVisible
+            end
 
             -- Când intrăm în meci, ascundem conținutul (Visible = false) din ecranele secundare
             if not isVisible then
@@ -278,6 +290,17 @@ if mainUI then
         end
     end
 end
+
+-- Rulăm funcția inițial la pornire
+setupUI()
+
+-- Re-rulăm funcția ori de câte ori caracterul moare și se respawnează
+-- (deoarece interfața din PlayerGui se distruge și se creează din nou din StarterGui)
+player.CharacterAdded:Connect(function()
+    -- Adăugăm un mic delay pentru a lăsa timp Roblox-ului să cloneze noile ScreenGui-uri din StarterGui în PlayerGui
+    task.wait(0.2)
+    setupUI()
+end)
 
 -- Remote Events
 local showCountdown = ReplicatedStorage:WaitForChild("ShowCountdownEvent", 10)
