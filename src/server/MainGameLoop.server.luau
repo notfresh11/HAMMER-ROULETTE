@@ -20,14 +20,6 @@ local function setupMap()
 
     local hammerSpawn = Workspace:WaitForChild("HammerSpawn", 10)
     if hammerSpawn then
-        for _, child in ipairs(hammerSpawn:GetChildren()) do
-            if child:IsA("BasePart") and child.Name ~= "HammerModel" then
-                child.Transparency = 1
-                child.Anchored = true
-                child.CanCollide = false
-            end
-        end
-
         -- PREVENT VOID FALL: Anchor HammerModel exactly when the server starts
         local hammerModel = hammerSpawn:WaitForChild("HammerModel", 10)
         if hammerModel then
@@ -41,6 +33,13 @@ local function setupMap()
             -- Ensure PrimaryPart exists for rotation
             if not hammerModel.PrimaryPart then
                 hammerModel.PrimaryPart = hammerModel:FindFirstChildWhichIsA("BasePart", true)
+            end
+
+            -- Teleport the visual hammer precisely above the blue block
+            local spawnBlock = hammerSpawn:WaitForChild("HammerSpawn", 5)
+            if spawnBlock and spawnBlock:IsA("BasePart") and hammerModel.PrimaryPart then
+                local targetCFrame = spawnBlock.CFrame * CFrame.new(0, 3, 0)
+                hammerModel:PivotTo(targetCFrame)
             end
 
             -- Continuous Idle Spin
@@ -59,36 +58,101 @@ end
 
 -- Main Game Loop
 local function gameLoop()
+    local Players = game:GetService("Players")
+
     while true do
-        print("MainLoop: Așteptăm jucători pentru o nouă rundă...")
+        print("MainLoop: Așteptăm jucători pentru un NOU MECI...")
         local success = Matchmaking.waitForPlayers()
 
         if success then
-            Matchmaking.teleportPlayersToSpawns()
-            task.wait(1) -- small delay for physics/camera to settle
+            -- Meciul începe, înregistrăm toți jucătorii care participă la acest meci
+            local activePlayers = Players:GetPlayers()
+            print("MainLoop: Meciul a început cu " .. #activePlayers .. " jucători!")
 
-            local chosenPlayer = Roulette.selectMaceBearer()
-            if chosenPlayer then
-                Roulette.playRouletteAnimation(chosenPlayer)
-
-                local roundEnded = false
-                local function onRoundEnd()
-                    roundEnded = true
+            -- Handle disconnects during the match to prevent softlocking
+            local disconnectConnection = Players.PlayerRemoving:Connect(function(leavingPlayer)
+                local idx = table.find(activePlayers, leavingPlayer)
+                if idx then
+                    table.remove(activePlayers, idx)
+                    print("MainLoop: " .. leavingPlayer.Name .. " a părăsit serverul și a fost eliminat din meci.")
                 end
+            end)
 
-                MaceMechanic.startMechanic(chosenPlayer, onRoundEnd)
+            -- Bucla de Runde (cât timp sunt cel puțin 2 supraviețuitori în meci)
+            while #activePlayers > 1 do
+                print("MainLoop: Începem o NOUĂ RUNDĂ cu " .. #activePlayers .. " supraviețuitori.")
+                Matchmaking.teleportPlayersToSpawns(activePlayers)
+                task.wait(1) -- small delay for physics/camera to settle
 
-                -- Wait until the round is marked as ended (by missing or dying)
-                while not roundEnded do
-                    task.wait(0.5)
+                local chosenPlayer = Roulette.selectMaceBearer(activePlayers)
+                if chosenPlayer then
+                    Roulette.playRouletteAnimation(chosenPlayer)
+
+                    local roundEnded = false
+                    local victimDied = false
+
+                    local function onRoundEnd()
+                        roundEnded = true
+                    end
+
+                    -- Conectăm un event rapid ca să știm dacă cineva din activePlayers a murit în această rundă
+                    local deathConnections = {}
+                    for _, player in ipairs(activePlayers) do
+                        if player.Character and player.Character:FindFirstChild("Humanoid") then
+                            table.insert(deathConnections, player.Character.Humanoid.Died:Connect(function()
+                                -- Scoatem jucătorul mort din lista de supraviețuitori ai meciului
+                                local idx = table.find(activePlayers, player)
+                                if idx then
+                                    table.remove(activePlayers, idx)
+                                    print("MainLoop: " .. player.Name .. " a fost ELIMINAT din meci!")
+                                end
+                            end))
+                        end
+                    end
+
+                    MaceMechanic.startMechanic(chosenPlayer, onRoundEnd)
+
+                    -- Wait until the round is marked as ended (by missing or the attacker dying)
+                    -- (If the attacker gets a kill, the mechanic keeps going and doesn't call onRoundEnd)
+                    while not roundEnded do
+                        -- If only 1 player is left active during the mechanic, force end
+                        if #activePlayers <= 1 then
+                            roundEnded = true
+                        end
+                        task.wait(0.5)
+                    end
+
+                    -- Clean up death connections
+                    for _, conn in ipairs(deathConnections) do
+                        conn:Disconnect()
+                    end
+                    table.clear(deathConnections)
+
+                    print("MainLoop: Runda s-a încheiat. Așteptăm cooldown 5 secunde...")
+                    task.wait(5)
+                else
+                    warn("MainLoop: Nu s-a putut alege un jucător!")
+                    task.wait(5)
+                    break
                 end
+            end -- End of Round Loop
 
-                print("MainLoop: Runda s-a încheiat. Așteptăm cooldown 5 secunde...")
-                task.wait(5)
-            else
-                warn("MainLoop: Nu s-a putut alege un jucător!")
-                task.wait(5)
+            if disconnectConnection then
+                disconnectConnection:Disconnect()
             end
+
+            -- Force cleanup of the mechanic in case a round ended abruptly (e.g. opponent died, leaving only the attacker)
+            if MaceMechanic.forceStopMechanic then
+                MaceMechanic.forceStopMechanic()
+            end
+
+            -- Dacă bucla de runde s-a terminat, înseamnă că meciul s-a încheiat (avem <= 1 supraviețuitori)
+            if #activePlayers == 1 then
+                print("MainLoop: MECIUL S-A TERMINAT! Câștigătorul este: " .. activePlayers[1].Name)
+            else
+                print("MainLoop: MECIUL S-A TERMINAT! Nu există niciun câștigător valid.")
+            end
+            task.wait(5) -- Timp înainte de a porni un nou meci global
         else
             -- Not enough players during countdown, loop will restart
             task.wait(2)

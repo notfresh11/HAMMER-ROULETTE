@@ -14,12 +14,11 @@ Players.PlayerRemoving:Connect(function(player)
     playerWeights[player.UserId] = nil
 end)
 
-function Roulette.selectMaceBearer()
-    local currentPlayers = Players:GetPlayers()
-    if #currentPlayers == 0 then return nil end
+function Roulette.selectMaceBearer(activePlayers)
+    if #activePlayers == 0 then return nil end
 
     local totalWeight = 0
-    for _, player in ipairs(currentPlayers) do
+    for _, player in ipairs(activePlayers) do
         local weight = playerWeights[player.UserId] or 1
         totalWeight = totalWeight + weight
     end
@@ -28,7 +27,7 @@ function Roulette.selectMaceBearer()
     local chosenPlayer = nil
     local currentSum = 0
 
-    for _, player in ipairs(currentPlayers) do
+    for _, player in ipairs(activePlayers) do
         local weight = playerWeights[player.UserId] or 1
         currentSum = currentSum + weight
         if randomValue <= currentSum then
@@ -39,11 +38,11 @@ function Roulette.selectMaceBearer()
 
     -- Fallback
     if not chosenPlayer then
-        chosenPlayer = currentPlayers[math.random(1, #currentPlayers)]
+        chosenPlayer = activePlayers[math.random(1, #activePlayers)]
     end
 
     -- Update weights
-    for _, player in ipairs(currentPlayers) do
+    for _, player in ipairs(activePlayers) do
         if player == chosenPlayer then
             playerWeights[player.UserId] = 1
         else

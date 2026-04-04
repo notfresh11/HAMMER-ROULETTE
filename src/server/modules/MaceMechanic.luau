@@ -37,8 +37,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
     end
 
     -- Boost Jump
-    humanoid.UseJumpPower = true
-    humanoid.JumpPower = 70
+    humanoid.UseJumpPower = false
+    humanoid.JumpHeight = 60
 
     -- Add a temporary force/state to disable fall damage if needed.
     -- In standard Roblox, fall damage isn't applied unless specifically scripted.
@@ -62,9 +62,11 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
         if humanoid then
             humanoid.UseJumpPower = false
             humanoid.JumpHeight = 7.2
-            humanoid.JumpPower = 50
         end
     end
+
+    -- Expose cleanup globally for abrupt match ends
+    MaceMechanic.forceStopMechanic = cleanup
 
     -- Track jumping/falling
     table.insert(connections, humanoid.StateChanged:Connect(function(oldState, newState)
