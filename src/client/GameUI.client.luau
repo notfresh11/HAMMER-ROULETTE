@@ -56,7 +56,22 @@ local TweenService = game:GetService("TweenService")
 -- === GUI INTERACTION LOGIC ===
 local isAFK = false -- State-ul AFK trebuie să fie persistent
 
+-- Stocăm toate conexiunile pentru a le putea curăța la respawn, evitând memory leaks și triggere duplicate
+local activeConnections = {}
+
+local function disconnectAll()
+    for _, connection in ipairs(activeConnections) do
+        if connection then
+            connection:Disconnect()
+        end
+    end
+    table.clear(activeConnections)
+end
+
 local function setupUI()
+    -- Curățăm conexiunile vechi înainte de a adăuga altele noi
+    disconnectAll()
+
     local mainUI = playerGui:WaitForChild("MAINUI")
     if not mainUI then return end
 
@@ -122,7 +137,7 @@ local function setupUI()
             afkButton.BackgroundColor3 = Color3.new(1, 0, 0) -- Red
         end
 
-        afkButton.MouseButton1Click:Connect(function()
+        table.insert(activeConnections, afkButton.MouseButton1Click:Connect(function()
             playSoundIsolated(clickSoundId)
             isAFK = not isAFK
 
@@ -168,18 +183,12 @@ local function setupUI()
                     afkTextFadeTween:Play()
                 end)
             end
-        end)
-    end
-
-    -- Curățăm și pentru Matchmaking UI event
-    if _G.UpdateMatchmakingUIConnection then
-        _G.UpdateMatchmakingUIConnection:Disconnect()
-        _G.UpdateMatchmakingUIConnection = nil
+        end))
     end
 
     local updateMatchmakingEvent = ReplicatedStorage:WaitForChild("UpdateMatchmakingUIEvent", 10)
     if updateMatchmakingEvent then
-        _G.UpdateMatchmakingUIConnection = updateMatchmakingEvent.OnClientEvent:Connect(function(textMsg, soundId)
+        table.insert(activeConnections, updateMatchmakingEvent.OnClientEvent:Connect(function(textMsg, soundId)
             local matchmakingUI = mainUI:FindFirstChild("MatchmakingUI")
             if matchmakingUI and matchmakingUI:IsA("TextLabel") then
                 matchmakingUI.Text = textMsg or ""
@@ -188,7 +197,7 @@ local function setupUI()
             if soundId and soundId ~= "" then
                 playSoundIsolated(soundId)
             end
-        end)
+        end))
     end
 
     -- Menu Toggling Logic
@@ -211,15 +220,36 @@ local function setupUI()
     -- Ascunde toate meniurile automat cand interfața se inițializează pentru a nu te bombarda pe ecran
     hideAllMenus()
 
-    -- Curățăm event-ul vechi dacă există, altfel se adună multiple triggere la fiecare moarte
-    if _G.ToggleMainUIConnection then
-        _G.ToggleMainUIConnection:Disconnect()
-        _G.ToggleMainUIConnection = nil
+    -- Helper function to open a menu with a pop-up animation
+    local function openMenu(frame)
+        if not frame then return end
+        frame.Visible = true
+
+        -- Store the original size if not already saved
+        if not frame:GetAttribute("OriginalSizeXScale") then
+            frame:SetAttribute("OriginalSizeXScale", frame.Size.X.Scale)
+            frame:SetAttribute("OriginalSizeXOffset", frame.Size.X.Offset)
+            frame:SetAttribute("OriginalSizeYScale", frame.Size.Y.Scale)
+            frame:SetAttribute("OriginalSizeYOffset", frame.Size.Y.Offset)
+        end
+
+        local targetSize = UDim2.new(
+            frame:GetAttribute("OriginalSizeXScale"),
+            frame:GetAttribute("OriginalSizeXOffset"),
+            frame:GetAttribute("OriginalSizeYScale"),
+            frame:GetAttribute("OriginalSizeYOffset")
+        )
+
+        -- Set to 0 instantly, then tween up
+        frame.Size = UDim2.new(0, 0, 0, 0)
+        local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        local tween = TweenService:Create(frame, tweenInfo, {Size = targetSize})
+        tween:Play()
     end
 
     local toggleMainUiEvent = ReplicatedStorage:WaitForChild("ToggleMainUIEvent", 10)
     if toggleMainUiEvent then
-        _G.ToggleMainUIConnection = toggleMainUiEvent.OnClientEvent:Connect(function(isVisible)
+        table.insert(activeConnections, toggleMainUiEvent.OnClientEvent:Connect(function(isVisible)
             if mainUI and mainUI.Parent then
                 mainUI.Enabled = isVisible
             end
@@ -228,7 +258,7 @@ local function setupUI()
             if not isVisible then
                 hideAllMenus()
             end
-        end)
+        end))
     end
 
     -- Assign logic to buttons
@@ -238,7 +268,7 @@ local function setupUI()
         -- Check both MAINUI and CornerButtons folder
         local button = mainUI:FindFirstChild(buttonName) or (cornerButtonsFolder and cornerButtonsFolder:FindFirstChild(buttonName))
         if button then
-            button.MouseButton1Click:Connect(function()
+            table.insert(activeConnections, button.MouseButton1Click:Connect(function()
                 playSoundIsolated(clickSoundId)
 
                 -- Toggle logic: if already open, just close it
@@ -246,9 +276,92 @@ local function setupUI()
                 hideAllMenus()
 
                 if targetFrame and not wasVisible then
-                    targetFrame.Visible = true
+                    openMenu(targetFrame)
                 end
-            end)
+            end))
+        end
+    end
+
+    -- ===========================
+    -- SHOP INTERNAL LOGIC
+    -- ===========================
+    if menus.ShopButton then
+        local shopFrame = menus.ShopButton
+        local pageButtonsContainer = shopFrame:FindFirstChild("PageButtons")
+
+        local currencyFrame = shopFrame:FindFirstChild("Currency")
+        local skinsFrame = shopFrame:FindFirstChild("Skins")
+
+        -- Default to Currency visible
+        if currencyFrame then currencyFrame.Visible = true end
+        if skinsFrame then skinsFrame.Visible = false end
+
+        local currencyBtn = pageButtonsContainer and pageButtonsContainer:FindFirstChild("Currency")
+        local exitBtn = currencyBtn and currencyBtn:FindFirstChild("ExitButton")
+
+        -- Logic for Exit Button
+        if exitBtn then
+            table.insert(activeConnections, exitBtn.MouseButton1Click:Connect(function()
+                playSoundIsolated(clickSoundId)
+                shopFrame.Visible = false
+            end))
+
+            -- Exit button hover animation
+            local origSize = exitBtn.Size
+            local hoverSize = UDim2.new(
+                origSize.X.Scale * 1.1, origSize.X.Offset * 1.1,
+                origSize.Y.Scale * 1.1, origSize.Y.Offset * 1.1
+            )
+            table.insert(activeConnections, exitBtn.MouseEnter:Connect(function()
+                TweenService:Create(exitBtn, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = hoverSize}):Play()
+            end))
+            table.insert(activeConnections, exitBtn.MouseLeave:Connect(function()
+                TweenService:Create(exitBtn, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = origSize}):Play()
+            end))
+        end
+
+        -- Logic for Internal Tabs (Currency vs Skins)
+        if pageButtonsContainer then
+            local skinsBtn = pageButtonsContainer:FindFirstChild("Skins")
+
+            local function showShopTab(tabName)
+                if currencyFrame then currencyFrame.Visible = (tabName == "Currency") end
+                if skinsFrame then skinsFrame.Visible = (tabName == "Skins") end
+            end
+
+            if currencyBtn then
+                table.insert(activeConnections, currencyBtn.MouseButton1Click:Connect(function()
+                    playSoundIsolated(clickSoundId)
+                    showShopTab("Currency")
+                end))
+
+                -- Hover animation for internal tab button
+                local origColor = currencyBtn.BackgroundColor3
+                local hoverColor = Color3.new(origColor.R * 0.8, origColor.G * 0.8, origColor.B * 0.8)
+                table.insert(activeConnections, currencyBtn.MouseEnter:Connect(function()
+                    TweenService:Create(currencyBtn, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
+                end))
+                table.insert(activeConnections, currencyBtn.MouseLeave:Connect(function()
+                    TweenService:Create(currencyBtn, TweenInfo.new(0.15), {BackgroundColor3 = origColor}):Play()
+                end))
+            end
+
+            if skinsBtn then
+                table.insert(activeConnections, skinsBtn.MouseButton1Click:Connect(function()
+                    playSoundIsolated(clickSoundId)
+                    showShopTab("Skins")
+                end))
+
+                -- Hover animation for internal tab button
+                local origColor = skinsBtn.BackgroundColor3
+                local hoverColor = Color3.new(origColor.R * 0.8, origColor.G * 0.8, origColor.B * 0.8)
+                table.insert(activeConnections, skinsBtn.MouseEnter:Connect(function()
+                    TweenService:Create(skinsBtn, TweenInfo.new(0.15), {BackgroundColor3 = hoverColor}):Play()
+                end))
+                table.insert(activeConnections, skinsBtn.MouseLeave:Connect(function()
+                    TweenService:Create(skinsBtn, TweenInfo.new(0.15), {BackgroundColor3 = origColor}):Play()
+                end))
+            end
         end
     end
 
@@ -261,15 +374,15 @@ local function setupUI()
                 originalSize.Y.Scale * 1.1, originalSize.Y.Offset * 1.1
             )
 
-            child.MouseEnter:Connect(function()
+            table.insert(activeConnections, child.MouseEnter:Connect(function()
                 local tween = TweenService:Create(child, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize})
                 tween:Play()
-            end)
+            end))
 
-            child.MouseLeave:Connect(function()
+            table.insert(activeConnections, child.MouseLeave:Connect(function()
                 local tween = TweenService:Create(child, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = originalSize})
                 tween:Play()
-            end)
+            end))
         end
     end
 
@@ -282,15 +395,15 @@ local function setupUI()
                 local originalColor = button.BackgroundColor3
                 local hoverColor = Color3.new(originalColor.R * 0.7, originalColor.G * 0.7, originalColor.B * 0.7)
 
-                button.MouseEnter:Connect(function()
+                table.insert(activeConnections, button.MouseEnter:Connect(function()
                     local tween = TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Linear), {BackgroundColor3 = hoverColor})
                     tween:Play()
-                end)
+                end))
 
-                button.MouseLeave:Connect(function()
+                table.insert(activeConnections, button.MouseLeave:Connect(function()
                     local tween = TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Linear), {BackgroundColor3 = originalColor})
                     tween:Play()
-                end)
+                end))
 
                 -- Also tween any ImageLabels inside it if they have images that act as icons
                 for _, icon in ipairs(button:GetChildren()) do
@@ -298,12 +411,12 @@ local function setupUI()
                         local origImgColor = icon.ImageColor3
                         local hoverImgColor = Color3.new(origImgColor.R * 0.7, origImgColor.G * 0.7, origImgColor.B * 0.7)
 
-                        button.MouseEnter:Connect(function()
+                        table.insert(activeConnections, button.MouseEnter:Connect(function()
                             TweenService:Create(icon, TweenInfo.new(0.15, Enum.EasingStyle.Linear), {ImageColor3 = hoverImgColor}):Play()
-                        end)
-                        button.MouseLeave:Connect(function()
+                        end))
+                        table.insert(activeConnections, button.MouseLeave:Connect(function()
                             TweenService:Create(icon, TweenInfo.new(0.15, Enum.EasingStyle.Linear), {ImageColor3 = origImgColor}):Play()
-                        end)
+                        end))
                     end
                 end
             end
