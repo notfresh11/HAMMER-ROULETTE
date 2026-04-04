@@ -170,12 +170,9 @@ function Roulette.playRouletteAnimation(targetPlayer, currentHammerInstance)
     -- The total rotation we want to apply around the global Y axis
     local totalYawToTravel = angleDiff + (math.pi * 2 * totalSpins)
 
-    -- Because the hammer is already flat on the ground (from MapManager and Idle animation),
-    -- initialPivot represents a flat hammer. We simply want to rotate this entire flat structure
-    -- around the global Y-axis passing through its center.
-
-    -- Target Pivot is the initial pivot rotated globally around its position
-    local targetFlatPivot = CFrame.new(initialPivot.Position) * CFrame.Angles(0, totalYawToTravel, 0) * (initialPivot - initialPivot.Position)
+    -- To ensure exact targeting, we compute targetFlatPivot by calculating
+    -- the exact offset required such that Tip ends up pointing towards target.
+    local targetFlatPivot = CFrame.new(initialPivot.Position) * CFrame.Angles(0, angleDiff, 0) * (initialPivot - initialPivot.Position)
 
     local connection
     connection = RunService.Heartbeat:Connect(function(dt)
