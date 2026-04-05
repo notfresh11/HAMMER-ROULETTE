@@ -215,23 +215,6 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
             trail.Enabled = true
             -- Imediat ce e în aer, îi tăiem JumpHeight ca să nu poată ține Space apăsat la nesfârșit (Bunny Hop)
             humanoid.JumpHeight = 0
-
-            -- NU mai anulăm pendingLandingEnd aici! Se anulează doar dacă dă hit.
-            -- Dacă a aterizat, runda se va închide chiar dacă sistemul crede că a reușit să sară iar.
-        elseif newState == Enum.HumanoidStateType.Landed then
-            trail.Enabled = false
-            if isFalling and roundActive then
-                -- Adăugăm un mic delay înainte de a opri runda
-                -- Acest lucru permite procesarea unui atac declanșat fix înainte de a atinge solul
-                pendingLandingEnd = task.delay(0.2, function()
-                    if roundActive then
-                        print(player.Name .. " a aterizat. Rateu! Runda se încheie.")
-                        cleanup()
-                        onRoundEndCallback()
-                    end
-                end)
-            end
-            isFalling = false
         end
     end))
 
@@ -242,15 +225,43 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
     table.insert(connections, RunService.Heartbeat:Connect(function()
         if not roundActive or not player then return end
 
-        -- Verificăm dacă e în aer. isFalling este setat de StateChanged Freefall
-        local currentState = humanoid:GetState()
-        local inAirState = (currentState == Enum.HumanoidStateType.Freefall)
+        local now = tick()
 
-        if not inAirState and not pendingLandingEnd then
+        -- Floor detection via raycast to be perfectly certain they touched the ground
+        if isFalling and humanoid.Health > 0 and rootPart then
+            -- Only check for landing if we are actually falling downwards (or at the peak of jump)
+            if rootPart.AssemblyLinearVelocity.Y <= 0 then
+                -- Set up raycast params to ignore the character itself
+                local rayParams = RaycastParams.new()
+                rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                rayParams.FilterDescendantsInstances = {character, hitboxPart}
+
+                -- Raycast from slightly above the bottom of the root part, pointing down past the legs
+                -- Distance adjusted to exactly 3.1 to avoid false triggers
+                local rayOrigin = rootPart.Position
+                local rayDirection = Vector3.new(0, -3.1, 0)
+
+                local raycastResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+
+                if raycastResult and not pendingLandingEnd then
+                    -- They touched the ground. Give a tiny margin to register any last-millisecond hit.
+                    trail.Enabled = false
+                    isFalling = false
+                    pendingLandingEnd = task.delay(0.2, function()
+                        if roundActive then
+                            print(player.Name .. " a aterizat. Rateu! Runda se încheie.")
+                            cleanup()
+                            onRoundEndCallback()
+                        end
+                    end)
+                end
+            end
+        end
+
+        if not isFalling and not pendingLandingEnd then
             return
         end
 
-        local now = tick()
         if now - lastHitTick < AUTO_HIT_COOLDOWN then return end
 
         local boxSize = hitboxPart.Size

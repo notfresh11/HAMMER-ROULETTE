@@ -68,11 +68,54 @@ local function disconnectAll()
     table.clear(activeConnections)
 end
 
+-- Funcție utilitară pentru a face orice element UI scalabil automat
+-- Funcție utilitară pentru a face ScreenGui-urile scalabile automat fără a strica structurile imbricate (nested UI)
+local function applyDynamicUIScale(screenGui)
+    if not screenGui or not screenGui:IsA("ScreenGui") then return end
+
+    local uiScale = screenGui:FindFirstChildOfClass("UIScale")
+    if not uiScale then
+        uiScale = Instance.new("UIScale")
+        uiScale.Parent = screenGui
+    end
+
+    local function updateScale()
+        local viewportSize = workspace.CurrentCamera.ViewportSize
+        -- Rezoluție de referință (ex: desktop 1920x1080)
+        local baseWidth = 1920
+        local baseHeight = 1080
+
+        -- Dacă viewport-ul e invalid, nu facem nimic
+        if viewportSize.X <= 0 or viewportSize.Y <= 0 then return end
+
+        -- Calculăm factorii de scalare
+        local scaleX = viewportSize.X / baseWidth
+        local scaleY = viewportSize.Y / baseHeight
+
+        -- Alegem scara cea mai mică pentru a ne asigura că tot conținutul intră pe ecran fără a fi trunchiat
+        local minScale = math.min(scaleX, scaleY)
+
+        -- Evităm scalarea în sus (peste 1) pentru ecrane foarte mari, doar micșorăm pe mobile
+        -- De asemenea, punem o limită inferioară ca să nu devină microscopic
+        uiScale.Scale = math.clamp(minScale, 0.3, 1)
+    end
+
+    -- Actualizăm scala inițial
+    updateScale()
+
+    -- Ascultăm schimbările de rezoluție (ex: rotirea telefonului, resize pe PC)
+    local conn = workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
+    table.insert(activeConnections, conn)
+end
+
 local function setupUI()
     -- Curățăm conexiunile vechi înainte de a adăuga altele noi
     disconnectAll()
 
     local mainUI = playerGui:WaitForChild("MAINUI")
+    if mainUI then
+        applyDynamicUIScale(mainUI)
+    end
     if not mainUI then return end
 
     -- Fix UI being pushed down by the topbar
@@ -90,9 +133,26 @@ local function setupUI()
     local settingsGui = playerGui:WaitForChild("Settings")
 
     -- Force Enable all root ScreenGuis in case user disabled them in Studio to save space
-    if questsGui then questsGui.Enabled = true end
-    if discordGui then discordGui.Enabled = true end
-    if statsGui then statsGui.Enabled = true end
+    if questsGui then
+        questsGui.Enabled = true
+        applyDynamicUIScale(questsGui)
+    end
+    if discordGui then
+        discordGui.Enabled = true
+        applyDynamicUIScale(discordGui)
+    end
+    if statsGui then
+        statsGui.Enabled = true
+        applyDynamicUIScale(statsGui)
+    end
+    if shopGui then
+        shopGui.Enabled = true
+        applyDynamicUIScale(shopGui)
+    end
+    if settingsGui then
+        settingsGui.Enabled = true
+        applyDynamicUIScale(settingsGui)
+    end
 
     -- PROGRESSION UI SETUP
     local levelFrame = mainUI:FindFirstChild("Level")
