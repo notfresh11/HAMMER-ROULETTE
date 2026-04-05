@@ -400,6 +400,9 @@ local function setupUI()
         local function setupAbilities(ownedAbilities, equippedAbility, abilitiesDef)
             if not frameAbilities then return end
 
+            ownedAbilities = ownedAbilities or {}
+            abilitiesDef = abilitiesDef or {}
+
             -- Căutăm șablonul (template-ul) făcut de utilizator
             local templateLayout = frameAbilities:FindFirstChild("AbLayout")
             if not templateLayout then
@@ -477,14 +480,13 @@ local function setupUI()
             end
         end
 
-        if abilityStateEvent then
-            table.insert(activeConnections, abilityStateEvent.OnClientEvent:Connect(function(ownedAbilities, equippedAbility, abilitiesDef)
-                setupAbilities(ownedAbilities, equippedAbility, abilitiesDef)
-            end))
+        -- Ensure events exist without timeout so they never silently fail
+        local abilityStateEvent = ReplicatedStorage:WaitForChild("AbilityStateEvent")
+        local abilityRequestEvent = ReplicatedStorage:WaitForChild("AbilityRequestEvent")
 
-            -- Request initial sync when opening shop for the first time
-            abilityRequestEvent:FireServer("RequestSync")
-        end
+        table.insert(activeConnections, abilityStateEvent.OnClientEvent:Connect(function(ownedAbilities, equippedAbility, abilitiesDef)
+            setupAbilities(ownedAbilities, equippedAbility, abilitiesDef)
+        end))
 
         -- Default State: Only Currency visible
         local function resetShopTabs()
@@ -511,6 +513,11 @@ local function setupUI()
             if frameCurrency then frameCurrency.Visible = (tabName == "Currency") end
             if frameSkins then frameSkins.Visible = (tabName == "Skins") end
             if frameVFX then frameVFX.Visible = (tabName == "VFX") end
+
+            -- Automatically request sync whenever we open the Abilities tab
+            if tabName == "Abilities" then
+                abilityRequestEvent:FireServer("RequestSync")
+            end
         end
 
         -- Bind tab buttons
@@ -520,6 +527,9 @@ local function setupUI()
                 showShopTab("Abilities")
             end))
         end
+
+        -- Initial Sync Request just in case the tab is default
+        abilityRequestEvent:FireServer("RequestSync")
 
         if skinsBtn then
             table.insert(activeConnections, skinsBtn.MouseButton1Click:Connect(function()
