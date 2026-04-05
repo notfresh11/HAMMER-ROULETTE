@@ -389,14 +389,25 @@ local function setupUI()
         local exitBtn = shopFrame:FindFirstChild("ExitButton")
 
         -- Abilities layout setup
+        -- Ascunde layout-ul original imediat ca să nu se vadă niciodată
+        if frameAbilities then
+            local templateLayout = frameAbilities:FindFirstChild("AbLayout")
+            if templateLayout then
+                templateLayout.Visible = false
+            end
+        end
+
         local function setupAbilities(ownedAbilities, equippedAbility, abilitiesDef)
             if not frameAbilities then return end
 
             -- Căutăm șablonul (template-ul) făcut de utilizator
             local templateLayout = frameAbilities:FindFirstChild("AbLayout")
-            if not templateLayout then return end
+            if not templateLayout then
+                warn("GameUI: Nu am găsit 'AbLayout' în 'FrameAb'!")
+                return
+            end
 
-            -- Ascundem template-ul original
+            -- Ascundem template-ul original în caz că era vizibil
             templateLayout.Visible = false
 
             -- Ștergem clonele vechi (cele care au numele abilității, nu template-ul)
@@ -441,6 +452,11 @@ local function setupUI()
                         actionBtn.Text = "BUY"
                         actionBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
                     end
+
+                    -- Asigură-te că imaginea și celelalte elemente sunt vizibile
+                    if nameLbl then nameLbl.Visible = true end
+                    if descLbl then descLbl.Visible = true end
+                    if iconLbl then iconLbl.Visible = true end
 
                     -- Conectăm funcționalitatea de Buy/Equip/Unequip
                     table.insert(activeConnections, actionBtn.MouseButton1Click:Connect(function()
