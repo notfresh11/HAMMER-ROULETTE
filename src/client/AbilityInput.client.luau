@@ -48,6 +48,7 @@ if dashVelocityEvent then
                     if attachment then attachment:Destroy() end
                     -- Oprește inerția ca să nu alunece mai departe
                     if rootPart and rootPart.Parent then
+                        -- Nu tăia complet Y-ul, altfel îl oprești din cădere/bounce
                         rootPart.AssemblyLinearVelocity = Vector3.new(0, rootPart.AssemblyLinearVelocity.Y, 0)
                     end
                 end)

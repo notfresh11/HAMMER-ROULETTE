@@ -104,6 +104,16 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
     humanoid.UseJumpPower = false
     humanoid.JumpHeight = 60
 
+    -- Play Equip Animation if it exists inside the Tool
+    local equipAnim = currentTool:FindFirstChild("Equip") or currentTool:FindFirstChild("equip")
+    if equipAnim and equipAnim:IsA("Animation") then
+        local animator = humanoid:FindFirstChildWhichIsA("Animator")
+        if animator then
+            local track = animator:LoadAnimation(equipAnim)
+            track:Play()
+        end
+    end
+
     -- Give the attacker an AntiCheat bypass because they jump high and move fast during mechanic
     AntiCheat.SetBypass(player, "Fly", 20)
     AntiCheat.SetBypass(player, "Speed", 20)
@@ -329,10 +339,24 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
                             playRandomHitSound(targetRoot)
                         end
 
+                        -- Play swing animation if we hit someone
+                        if currentTool then
+                            local attackAnim = currentTool:FindFirstChild("Attack") or currentTool:FindFirstChild("attack")
+                            if attackAnim and attackAnim:IsA("Animation") then
+                                local animator = humanoid:FindFirstChildWhichIsA("Animator")
+                                if animator then
+                                    local track = animator:LoadAnimation(attackAnim)
+                                    track:Play()
+                                end
+                            end
+                        end
+
                         -- Hit Pause! Înghețăm temporar atacatorul în aer pt 0.08 secunde
                         rootPart.Anchored = true
                         task.delay(0.08, function()
-                            rootPart.Anchored = false
+                            if rootPart and rootPart.Parent then
+                                rootPart.Anchored = false
+                            end
 
                             -- Renew bypass before bounce to ensure it covers the bounce distance/time
                             AntiCheat.SetBypass(player, "Fly", 5)
