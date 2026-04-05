@@ -15,7 +15,9 @@ local INITIAL_DATA = {
     Items = {},
     KillStreak = 0,
     WinStreak = 0,
-    SurviveStreak = 0
+    SurviveStreak = 0,
+    OwnedAbilities = { ["Dash"] = true },
+    EquippedAbility = "Dash"
 }
 
 -- Deep copy function to avoid modifying the template
