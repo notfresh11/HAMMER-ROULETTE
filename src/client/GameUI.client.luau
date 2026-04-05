@@ -392,99 +392,72 @@ local function setupUI()
         local function setupAbilities(ownedAbilities, equippedAbility, abilitiesDef)
             if not frameAbilities then return end
 
-            local abLayout = frameAbilities:FindFirstChild("AbLayout")
-            if not abLayout then return end
+            -- Căutăm șablonul (template-ul) făcut de utilizator
+            local templateLayout = frameAbilities:FindFirstChild("AbLayout")
+            if not templateLayout then return end
 
-            -- Clear existing dynamic elements except UI components like UIListLayout and UICorner
-            for _, child in ipairs(abLayout:GetChildren()) do
-                if child:IsA("TextButton") then
+            -- Ascundem template-ul original
+            templateLayout.Visible = false
+
+            -- Ștergem clonele vechi (cele care au numele abilității, nu template-ul)
+            for _, child in ipairs(frameAbilities:GetChildren()) do
+                if child ~= templateLayout and not child:IsA("UIListLayout") and not child:IsA("UICorner") then
                     child:Destroy()
                 end
             end
 
             for abilityName, def in pairs(abilitiesDef) do
-                local itemBtn = Instance.new("TextButton")
-                itemBtn.Name = abilityName
-                itemBtn.Size = UDim2.new(1, 0, 0, 100) -- Adjust as needed based on layout
-                itemBtn.BackgroundColor3 = Color3.fromRGB(50, 60, 80)
-                itemBtn.Text = ""
-                itemBtn.AutoButtonColor = false
+                -- Clonăm șablonul
+                local itemClone = templateLayout:Clone()
+                itemClone.Name = abilityName
+                itemClone.Visible = true
 
-                local corner = Instance.new("UICorner", itemBtn)
-                corner.CornerRadius = UDim.new(0, 8)
+                -- Găsim componentele din interiorul clonei pe baza ierarhiei date de utilizator
+                local actionBtn = itemClone:FindFirstChild("TextButton")
+                if actionBtn then
+                    local nameLbl = actionBtn:FindFirstChild("ItemName")
+                    local descLbl = actionBtn:FindFirstChild("ItemDescription")
+                    local priceLbl = actionBtn:FindFirstChild("ItemPrice")
+                    local iconLbl = actionBtn:FindFirstChild("ItemImage")
 
-                local icon = Instance.new("ImageLabel", itemBtn)
-                icon.Name = "ItemImage"
-                icon.Size = UDim2.new(0, 80, 0, 80)
-                icon.Position = UDim2.new(0, 10, 0.5, 0)
-                icon.AnchorPoint = Vector2.new(0, 0.5)
-                icon.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-                -- Add default placeholder image or ability specific image here
-                icon.Image = "rbxassetid://0"
+                    if nameLbl then nameLbl.Text = def.Name end
+                    if descLbl then descLbl.Text = def.Description end
 
-                local nameLbl = Instance.new("TextLabel", itemBtn)
-                nameLbl.Name = "ItemName"
-                nameLbl.Size = UDim2.new(0, 200, 0, 30)
-                nameLbl.Position = UDim2.new(0, 100, 0, 10)
-                nameLbl.BackgroundTransparency = 1
-                nameLbl.Text = def.Name
-                nameLbl.TextColor3 = Color3.new(1, 1, 1)
-                nameLbl.TextXAlignment = Enum.TextXAlignment.Left
-                nameLbl.Font = Enum.Font.GothamBold
-                nameLbl.TextSize = 20
-
-                local descLbl = Instance.new("TextLabel", itemBtn)
-                descLbl.Name = "ItemDescription"
-                descLbl.Size = UDim2.new(1, -200, 0, 50)
-                descLbl.Position = UDim2.new(0, 100, 0, 40)
-                descLbl.BackgroundTransparency = 1
-                descLbl.Text = def.Description
-                descLbl.TextColor3 = Color3.new(0.8, 0.8, 0.8)
-                descLbl.TextXAlignment = Enum.TextXAlignment.Left
-                descLbl.TextYAlignment = Enum.TextYAlignment.Top
-                descLbl.TextWrapped = true
-                descLbl.Font = Enum.Font.Gotham
-                descLbl.TextSize = 14
-
-                local actionBtn = Instance.new("TextButton", itemBtn)
-                actionBtn.Name = "ActionButton"
-                actionBtn.Size = UDim2.new(0, 120, 0, 40)
-                actionBtn.Position = UDim2.new(1, -130, 0.5, 0)
-                actionBtn.AnchorPoint = Vector2.new(0, 0.5)
-
-                local actionCorner = Instance.new("UICorner", actionBtn)
-                actionCorner.CornerRadius = UDim.new(0, 6)
-                actionBtn.Font = Enum.Font.GothamBold
-                actionBtn.TextSize = 16
-                actionBtn.TextColor3 = Color3.new(1, 1, 1)
-
-                if ownedAbilities[abilityName] then
-                    if equippedAbility == abilityName then
-                        actionBtn.Text = "UNEQUIP"
-                        actionBtn.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
-                    else
-                        actionBtn.Text = "EQUIP"
-                        actionBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
-                    end
-                else
-                    actionBtn.Text = "BUY " .. def.Price
-                    actionBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-                end
-
-                table.insert(activeConnections, actionBtn.MouseButton1Click:Connect(function()
-                    playSoundIsolated("rbxassetid://124476359159008")
+                    -- Configurăm butonul în sine
                     if ownedAbilities[abilityName] then
+                        if priceLbl then priceLbl.Visible = false end -- Ascundem prețul dacă o deține
                         if equippedAbility == abilityName then
-                            abilityRequestEvent:FireServer("Unequip", abilityName)
+                            actionBtn.Text = "UNEQUIP"
+                            actionBtn.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
                         else
-                            abilityRequestEvent:FireServer("Equip", abilityName)
+                            actionBtn.Text = "EQUIP"
+                            actionBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
                         end
                     else
-                        abilityRequestEvent:FireServer("Buy", abilityName)
+                        if priceLbl then
+                            priceLbl.Visible = true
+                            priceLbl.Text = "PRICE " .. tostring(def.Price)
+                        end
+                        actionBtn.Text = "BUY"
+                        actionBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
                     end
-                end))
 
-                itemBtn.Parent = abLayout
+                    -- Conectăm funcționalitatea de Buy/Equip/Unequip
+                    table.insert(activeConnections, actionBtn.MouseButton1Click:Connect(function()
+                        playSoundIsolated("rbxassetid://124476359159008")
+                        if ownedAbilities[abilityName] then
+                            if equippedAbility == abilityName then
+                                abilityRequestEvent:FireServer("Unequip", abilityName)
+                            else
+                                abilityRequestEvent:FireServer("Equip", abilityName)
+                            end
+                        else
+                            abilityRequestEvent:FireServer("Buy", abilityName)
+                        end
+                    end))
+                end
+
+                itemClone.Parent = frameAbilities
             end
         end
 
