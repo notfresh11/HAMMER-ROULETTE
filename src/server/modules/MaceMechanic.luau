@@ -261,59 +261,71 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
                 if hitHumanoid and hitHumanoid.Health > 0 then
                     local hitPlayer = Players:GetPlayerFromCharacter(hitChar)
                     if hitPlayer then
-                        -- KILL!
+                        local victimHasShield = hitChar:GetAttribute("ShieldActive")
 
-                        -- Prevent the default Roblox "Oof" / death sound from playing
-                        -- Roblox client audio replication sometimes caches the sound before Destroy propagates.
-                        -- Setting Volume = 0 and overriding the ID prevents it entirely.
-                        local function disableDeathSound(part)
-                            if part then
-                                for _, child in ipairs(part:GetChildren()) do
-                                    if child:IsA("Sound") and (child.Name == "Died" or child.Name == "Oof") then
-                                        child.Volume = 0
-                                        child.SoundId = ""
-                                        child:Stop()
-                                        child:Destroy()
+                        -- KILL OR SHIELD BREAK!
+                        if victimHasShield then
+                            print(player.Name .. " a lovit scutul lui " .. hitPlayer.Name .. " (Auto-Hit)!")
+                            hitChar:SetAttribute("ShieldActive", false)
+                            local forceField = hitChar:FindFirstChildOfClass("ForceField")
+                            if forceField then forceField:Destroy() end
+                        else
+                            -- Prevent the default Roblox "Oof" / death sound from playing
+                            -- Roblox client audio replication sometimes caches the sound before Destroy propagates.
+                            -- Setting Volume = 0 and overriding the ID prevents it entirely.
+                            local function disableDeathSound(part)
+                                if part then
+                                    for _, child in ipairs(part:GetChildren()) do
+                                        if child:IsA("Sound") and (child.Name == "Died" or child.Name == "Oof") then
+                                            child.Volume = 0
+                                            child.SoundId = ""
+                                            child:Stop()
+                                            child:Destroy()
+                                        end
                                     end
                                 end
                             end
+
+                            -- Căutăm sunetul de death și în RootPart și în Head (de obicei apare acolo)
+                            local victimRoot = hitChar:FindFirstChild("HumanoidRootPart")
+                            local victimHead = hitChar:FindFirstChild("Head")
+
+                            disableDeathSound(victimRoot)
+                            disableDeathSound(victimHead)
+
+                            hitHumanoid.Health = 0
+                            print(player.Name .. " l-a ucis automat pe " .. hitPlayer.Name .. " (Auto-Hit)!")
+
+                            -- Add Kill Reward
+                            ProgressionManager.ProcessKill(player)
+
+                            -- Ascunde victima și colectează culorile ei
+                            local victimColors = {}
+                            for _, p in ipairs(hitChar:GetDescendants()) do
+                                if p:IsA("BasePart") then
+                                    table.insert(victimColors, p.Color)
+                                    p.Transparency = 1
+                                    p.CanCollide = false
+                                    -- Oprim și eventualele decals/fețe ca să fie invizibil complet
+                                    for _, d in ipairs(p:GetChildren()) do
+                                        if d:IsA("Decal") then d.Transparency = 1 end
+                                    end
+                                end
+                            end
+
+                            -- Trigger VFX pe toți clienții
+                            local vfxEvent = ReplicatedStorage:FindFirstChild("VfxEvent")
+                            local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
+                            if targetRoot and vfxEvent then
+                                vfxEvent:FireAllClients(targetRoot.Position, victimColors)
+                            end
                         end
-
-                        -- Căutăm sunetul de death și în RootPart și în Head (de obicei apare acolo)
-                        local victimRoot = hitChar:FindFirstChild("HumanoidRootPart")
-                        local victimHead = hitChar:FindFirstChild("Head")
-
-                        disableDeathSound(victimRoot)
-                        disableDeathSound(victimHead)
-
-                        hitHumanoid.Health = 0
-                        print(player.Name .. " l-a ucis automat pe " .. hitPlayer.Name .. " (Auto-Hit)!")
-
-                        -- Add Kill Reward
-                        ProgressionManager.ProcessKill(player)
 
                         hitRegistered = true
                         lastHitTick = tick()
 
-                        -- Ascunde victima și colectează culorile ei
-                        local victimColors = {}
-                        for _, p in ipairs(hitChar:GetDescendants()) do
-                            if p:IsA("BasePart") then
-                                table.insert(victimColors, p.Color)
-                                p.Transparency = 1
-                                p.CanCollide = false
-                                -- Oprim și eventualele decals/fețe ca să fie invizibil complet
-                                for _, d in ipairs(p:GetChildren()) do
-                                    if d:IsA("Decal") then d.Transparency = 1 end
-                                end
-                            end
-                        end
-
-                        -- Trigger VFX pe toți clienții
-                        local vfxEvent = ReplicatedStorage:FindFirstChild("VfxEvent")
                         local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
-                        if targetRoot and vfxEvent then
-                            vfxEvent:FireAllClients(targetRoot.Position, victimColors)
+                        if targetRoot then
                             playRandomHitSound(targetRoot)
                         end
 

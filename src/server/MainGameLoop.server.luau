@@ -40,6 +40,7 @@ local MapManager = require(script.Parent.modules.MapManager)
 local DataManager = require(script.Parent.modules.DataManager)
 local ProgressionManager = require(script.Parent.modules.ProgressionManager)
 local AntiCheat = require(script.Parent.modules.AntiCheat)
+local AbilityManager = require(script.Parent.modules.AbilityManager)
 
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
