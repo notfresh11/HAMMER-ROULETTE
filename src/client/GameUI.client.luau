@@ -144,8 +144,9 @@ local function setupUI()
 
             -- Ascultăm UpdateStatsEvent
             local updateStatsEvent = ReplicatedStorage:WaitForChild("UpdateStatsEvent", 5)
-    local abilityRequestEvent = ReplicatedStorage:WaitForChild("AbilityRequestEvent", 5)
-    local abilityStateEvent = ReplicatedStorage:WaitForChild("AbilityStateEvent", 5)
+            local abilityRequestEvent = ReplicatedStorage:WaitForChild("AbilityRequestEvent", 5)
+            local abilityStateEvent = ReplicatedStorage:WaitForChild("AbilityStateEvent", 5)
+
             if updateStatsEvent then
                 table.insert(activeConnections, updateStatsEvent.OnClientEvent:Connect(function(level, currentXp, requiredXp, coins)
                     -- Update XP Texts
@@ -387,6 +388,14 @@ local function setupUI()
 
         -- Ref to the Exit Button (Expecting it directly under shopFrame now to prevent hover scaling inheritance)
         local exitBtn = shopFrame:FindFirstChild("ExitButton")
+
+        -- Asigurăm că eventurile există, având timeout mic de la început, pot da silent fail
+        if not abilityRequestEvent then
+            abilityRequestEvent = ReplicatedStorage:WaitForChild("AbilityRequestEvent")
+        end
+        if not abilityStateEvent then
+            abilityStateEvent = ReplicatedStorage:WaitForChild("AbilityStateEvent")
+        end
 
         -- Abilities layout setup
         -- Ascunde layout-ul original imediat ca să nu se vadă niciodată
