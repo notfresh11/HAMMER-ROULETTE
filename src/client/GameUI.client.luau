@@ -426,20 +426,34 @@ local function setupUI()
                 itemClone.Name = abilityName
                 itemClone.Visible = true
 
-                -- Găsim componentele din interiorul clonei pe baza ierarhiei date de utilizator
-                local actionBtn = itemClone:FindFirstChild("TextButton")
+                -- Găsim componentele din interiorul clonei.
+                -- Folosim a doua variabila "true" la FindFirstChild pentru o cautare recursiva,
+                -- astfel incat sa gaseasca elementele indiferent daca sunt in clona radacina sau in TextButton
+                local actionBtn = itemClone:FindFirstChild("TextButton", true)
+                local nameLbl = itemClone:FindFirstChild("ItemName", true)
+                local descLbl = itemClone:FindFirstChild("ItemDescription", true)
+                local priceLbl = itemClone:FindFirstChild("ItemPrice", true)
+                local iconLbl = itemClone:FindFirstChild("ItemImage", true)
+
+                if nameLbl then
+                    nameLbl.Text = def.Name
+                    nameLbl.Visible = true
+                end
+
+                if descLbl then
+                    descLbl.Text = def.Description
+                    descLbl.Visible = true
+                end
+
+                if iconLbl then
+                    iconLbl.Visible = true
+                end
+
                 if actionBtn then
-                    local nameLbl = actionBtn:FindFirstChild("ItemName")
-                    local descLbl = actionBtn:FindFirstChild("ItemDescription")
-                    local priceLbl = actionBtn:FindFirstChild("ItemPrice")
-                    local iconLbl = actionBtn:FindFirstChild("ItemImage")
-
-                    if nameLbl then nameLbl.Text = def.Name end
-                    if descLbl then descLbl.Text = def.Description end
-
-                    -- Configurăm butonul în sine
+                    -- Configurăm starea butonului și prețul
                     if ownedAbilities[abilityName] then
                         if priceLbl then priceLbl.Visible = false end -- Ascundem prețul dacă o deține
+
                         if equippedAbility == abilityName then
                             actionBtn.Text = "UNEQUIP"
                             actionBtn.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
@@ -452,14 +466,10 @@ local function setupUI()
                             priceLbl.Visible = true
                             priceLbl.Text = "PRICE " .. tostring(def.Price)
                         end
+
                         actionBtn.Text = "BUY"
                         actionBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
                     end
-
-                    -- Asigură-te că imaginea și celelalte elemente sunt vizibile
-                    if nameLbl then nameLbl.Visible = true end
-                    if descLbl then descLbl.Visible = true end
-                    if iconLbl then iconLbl.Visible = true end
 
                     -- Conectăm funcționalitatea de Buy/Equip/Unequip
                     table.insert(activeConnections, actionBtn.MouseButton1Click:Connect(function()
@@ -474,6 +484,8 @@ local function setupUI()
                             abilityRequestEvent:FireServer("Buy", abilityName)
                         end
                     end))
+                else
+                    warn("GameUI: 'TextButton' nu a fost găsit în clona pentru abilitatea " .. abilityName)
                 end
 
                 itemClone.Parent = frameAbilities
