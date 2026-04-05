@@ -60,6 +60,26 @@ end
 -- Handling UI Requests
 abilityRequestEvent.OnServerEvent:Connect(function(player, action, abilityName)
     local data = DataManager.GetData(player)
+
+    if action == "RequestSync" then
+        if data then
+            syncAbilities(player)
+        else
+            -- Data might still be loading from DataStore, wait for it
+            task.spawn(function()
+                local retries = 0
+                while not DataManager.GetData(player) and retries < 10 do
+                    task.wait(1)
+                    retries += 1
+                end
+                if DataManager.GetData(player) then
+                    syncAbilities(player)
+                end
+            end)
+        end
+        return
+    end
+
     if not data then return end
 
     if action == "Buy" then
@@ -81,8 +101,6 @@ abilityRequestEvent.OnServerEvent:Connect(function(player, action, abilityName)
             data.EquippedAbility = nil
             syncAbilities(player)
         end
-    elseif action == "RequestSync" then
-        syncAbilities(player)
     end
 end)
 
