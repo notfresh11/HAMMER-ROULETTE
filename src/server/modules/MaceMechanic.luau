@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local ProgressionManager = require(script.Parent.ProgressionManager)
+local AntiCheat = require(script.Parent.AntiCheat)
 
 local currentTool = nil
 local connections = {}
@@ -102,6 +103,10 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
     -- Boost Jump
     humanoid.UseJumpPower = false
     humanoid.JumpHeight = 60
+
+    -- Give the attacker an AntiCheat bypass because they jump high and move fast during mechanic
+    AntiCheat.SetBypass(player, "Fly", 20)
+    AntiCheat.SetBypass(player, "Speed", 20)
 
     -- VFX: Highlight & Trail Setup
     local highlight = Instance.new("Highlight")
@@ -316,6 +321,11 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
                         rootPart.Anchored = true
                         task.delay(0.08, function()
                             rootPart.Anchored = false
+
+                            -- Renew bypass before bounce to ensure it covers the bounce distance/time
+                            AntiCheat.SetBypass(player, "Fly", 5)
+                            AntiCheat.SetBypass(player, "Speed", 5)
+
                             -- Bounce the attacker after the pause
                             local bounceEvent = ReplicatedStorage:FindFirstChild("MaceBounceEvent")
                             if bounceEvent then
