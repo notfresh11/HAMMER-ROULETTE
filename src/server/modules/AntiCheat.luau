@@ -18,6 +18,14 @@ local function initPlayerAC(player)
         AirTime = 0,
         Cooldowns = {}
     }
+
+    -- Reset LastPosition when character respawns to prevent false positive teleports
+    player.CharacterAdded:Connect(function(character)
+        local data = acData[player.UserId]
+        if data then
+            data.LastPosition = nil
+        end
+    end)
 end
 
 local function cleanupPlayerAC(player)

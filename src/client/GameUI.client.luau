@@ -492,10 +492,6 @@ local function setupUI()
             end
         end
 
-        -- Ensure events exist without timeout so they never silently fail
-        local abilityStateEvent = ReplicatedStorage:WaitForChild("AbilityStateEvent")
-        local abilityRequestEvent = ReplicatedStorage:WaitForChild("AbilityRequestEvent")
-
         table.insert(activeConnections, abilityStateEvent.OnClientEvent:Connect(function(ownedAbilities, equippedAbility, abilitiesDef)
             setupAbilities(ownedAbilities, equippedAbility, abilitiesDef)
         end))
