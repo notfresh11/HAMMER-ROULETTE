@@ -39,6 +39,7 @@ local MaceMechanic = require(script.Parent.modules.MaceMechanic)
 local MapManager = require(script.Parent.modules.MapManager)
 local DataManager = require(script.Parent.modules.DataManager)
 local ProgressionManager = require(script.Parent.modules.ProgressionManager)
+local AntiCheat = require(script.Parent.modules.AntiCheat)
 
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
@@ -307,5 +308,6 @@ local function gameLoop()
 end
 
 -- Start
+AntiCheat.Start()
 setupMap()
 gameLoop()
