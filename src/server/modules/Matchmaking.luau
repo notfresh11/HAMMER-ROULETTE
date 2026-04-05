@@ -4,6 +4,7 @@ local Workspace = game:GetService("Workspace")
 
 local MIN_PLAYERS = 2
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local AntiCheat = require(script.Parent.AntiCheat)
 
 local function getActivePlayers()
     local activePlayers = {}
@@ -109,6 +110,9 @@ function Matchmaking.teleportPlayersToSpawns(activePlayers, currentMapInstance)
                 else
                     targetCFrame = CFrame.new((index - 1) * 5, 50, 0)
                 end
+
+                -- Add temporary AntiCheat bypass for intentional teleport
+                AntiCheat.SetBypass(player, "Speed", 5)
 
                 rootPart.CFrame = targetCFrame
             end

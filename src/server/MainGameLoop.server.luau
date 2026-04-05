@@ -150,6 +150,7 @@ local function gameLoop()
             -- Rewards for participation & Hide UI
             local toggleMainUiEvent = ReplicatedStorage:FindFirstChild("ToggleMainUIEvent")
             for _, player in ipairs(activePlayers) do
+                player:SetAttribute("InMatch", true)
                 ProgressionManager.ProcessMatchParticipation(player)
                 if toggleMainUiEvent then
                     toggleMainUiEvent:FireClient(player, false)
@@ -209,6 +210,7 @@ local function gameLoop()
                                 if idx then
                                     table.remove(activePlayers, idx)
                                     print("MainLoop: " .. player.Name .. " a fost ELIMINAT din meci!")
+                                    player:SetAttribute("InMatch", false)
                                     -- Afișăm MAINUI din nou pentru cel eliminat
                                     if toggleMainUiEvent then
                                         toggleMainUiEvent:FireClient(player, true)
@@ -262,6 +264,7 @@ local function gameLoop()
                 -- Dacă bucla de runde s-a terminat, înseamnă că meciul s-a încheiat (avem <= 1 supraviețuitori)
                 if #activePlayers == 1 then
                     local winner = activePlayers[1]
+                    winner:SetAttribute("InMatch", false)
                     print("MainLoop: MECIUL S-A TERMINAT! Câștigătorul este: " .. winner.Name)
 
                     -- Match Win Rewards
@@ -287,10 +290,16 @@ local function gameLoop()
                         if #spawns > 0 then
                             -- Pick a random spawn point to teleport the winner
                             local chosenSpawn = spawns[math.random(1, #spawns)]
+                            -- Add AntiCheat bypass for winner teleport
+                            AntiCheat.SetBypass(winner, "Speed", 5)
+
                             -- Y offset is half the spawn height + half character height roughly, 5 is a safe amount
                             rootPart.CFrame = chosenSpawn.CFrame * CFrame.new(0, chosenSpawn.Size.Y/2 + 3, 0)
                             print("MainLoop: Câștigătorul a fost teleportat la spawn.")
                         else
+                            -- Add AntiCheat bypass for fallback winner teleport
+                            AntiCheat.SetBypass(winner, "Speed", 5)
+
                             -- Fallback just in case no default spawn exists
                             rootPart.CFrame = CFrame.new(0, 50, 0)
                             warn("MainLoop: Nu s-a găsit niciun SpawnLocation în Workspace. S-a folosit coordonata de fallback.")

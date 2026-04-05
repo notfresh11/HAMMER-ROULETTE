@@ -6,6 +6,7 @@ local TweenService = game:GetService("TweenService")
 
 local DataManager = require(script.Parent.DataManager)
 local AntiCheat = require(script.Parent.AntiCheat)
+local ProgressionManager = require(script.Parent.ProgressionManager)
 
 local AbilityManager = {}
 
@@ -50,6 +51,13 @@ if not abilityStateEvent then
     abilityStateEvent.Parent = ReplicatedStorage
 end
 
+local dashVelocityEvent = ReplicatedStorage:FindFirstChild("DashVelocityEvent")
+if not dashVelocityEvent then
+    dashVelocityEvent = Instance.new("RemoteEvent")
+    dashVelocityEvent.Name = "DashVelocityEvent"
+    dashVelocityEvent.Parent = ReplicatedStorage
+end
+
 local function syncAbilities(player)
     local data = DataManager.GetData(player)
     if data then
@@ -86,7 +94,7 @@ abilityRequestEvent.OnServerEvent:Connect(function(player, action, abilityName)
         local abilityDef = Abilities[abilityName]
         if abilityDef and not data.OwnedAbilities[abilityName] then
             if data.Coins >= abilityDef.Price then
-                DataManager.IncrementValue(player, "Coins", -abilityDef.Price)
+                ProgressionManager.AddCoins(player, -abilityDef.Price)
                 data.OwnedAbilities[abilityName] = true
                 syncAbilities(player)
             end
@@ -111,10 +119,11 @@ local function applyDash(player)
     if not rootPart then return end
 
     -- AntiCheat Bypass
-    AntiCheat.SetBypass(player, "SpeedBypassUntil", tick() + 1)
+    AntiCheat.SetBypass(player, "Speed", 1)
 
+    -- Apply velocity locally via RemoteEvent to bypass network ownership issues
     local dashVelocity = rootPart.CFrame.LookVector * 100
-    rootPart.AssemblyLinearVelocity = Vector3.new(dashVelocity.X, rootPart.AssemblyLinearVelocity.Y, dashVelocity.Z)
+    dashVelocityEvent:FireClient(player, dashVelocity)
 
     -- Trail Effect
     local attachment0 = Instance.new("Attachment", rootPart)
@@ -155,6 +164,9 @@ end
 
 -- Handling Ability Use
 abilityUseEvent.OnServerEvent:Connect(function(player)
+    -- Abilitatile functioneaza doar in meci
+    if not player:GetAttribute("InMatch") then return end
+
     local data = DataManager.GetData(player)
     if not data or not data.EquippedAbility then return end
 
