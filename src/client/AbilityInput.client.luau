@@ -31,7 +31,26 @@ if dashVelocityEvent then
         if character then
             local rootPart = character:FindFirstChild("HumanoidRootPart")
             if rootPart then
-                rootPart.AssemblyLinearVelocity = Vector3.new(dashVelocity.X, rootPart.AssemblyLinearVelocity.Y, dashVelocity.Z)
+                -- Apply a LinearVelocity for a short duration to make it feel like a real dash
+                local attachment = Instance.new("Attachment", rootPart)
+
+                local linearVelocity = Instance.new("LinearVelocity")
+                linearVelocity.Attachment0 = attachment
+                linearVelocity.MaxForce = 100000 -- Putere mare ca să învingă fricțiunea și greutatea
+                linearVelocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
+                linearVelocity.VectorVelocity = Vector3.new(dashVelocity.X, 0, dashVelocity.Z)
+                linearVelocity.RelativeTo = Enum.ActuatorRelativeTo.World
+                linearVelocity.Parent = rootPart
+
+                -- Distruge după 0.25 secunde (durata dash-ului)
+                task.delay(0.25, function()
+                    if linearVelocity then linearVelocity:Destroy() end
+                    if attachment then attachment:Destroy() end
+                    -- Oprește inerția ca să nu alunece mai departe
+                    if rootPart and rootPart.Parent then
+                        rootPart.AssemblyLinearVelocity = Vector3.new(0, rootPart.AssemblyLinearVelocity.Y, 0)
+                    end
+                end)
             end
         end
     end)

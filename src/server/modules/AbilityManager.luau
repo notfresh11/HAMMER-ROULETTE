@@ -97,6 +97,15 @@ abilityRequestEvent.OnServerEvent:Connect(function(player, action, abilityName)
                 ProgressionManager.AddCoins(player, -abilityDef.Price)
                 data.OwnedAbilities[abilityName] = true
                 syncAbilities(player)
+            else
+                local showTextEvent = ReplicatedStorage:FindFirstChild("ShowTextEvent")
+                if showTextEvent then
+                    showTextEvent:FireClient(player, "Not enough coins!", Color3.new(1, 0, 0), "rbxassetid://138081502")
+                    task.delay(1.5, function()
+                        local hideTextEvent = ReplicatedStorage:FindFirstChild("HideTextEvent")
+                        if hideTextEvent then hideTextEvent:FireClient(player) end
+                    end)
+                end
             end
         end
     elseif action == "Equip" then
@@ -122,7 +131,7 @@ local function applyDash(player)
     AntiCheat.SetBypass(player, "Speed", 1)
 
     -- Apply velocity locally via RemoteEvent to bypass network ownership issues
-    local dashVelocity = rootPart.CFrame.LookVector * 100
+    local dashVelocity = rootPart.CFrame.LookVector * 150
     dashVelocityEvent:FireClient(player, dashVelocity)
 
     -- Trail Effect

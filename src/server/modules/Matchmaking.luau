@@ -90,32 +90,38 @@ function Matchmaking.teleportPlayersToSpawns(activePlayers, currentMapInstance)
     for index, player in ipairs(activePlayers) do
         -- Only teleport if they are actually in game and alive
         if player and player.Parent == Players then
-            local character = player.Character
-            if character and character:FindFirstChild("HumanoidRootPart") then
-                local rootPart = character.HumanoidRootPart
-                local targetCFrame = CFrame.new(0, 50, 0) -- fallback
+            task.spawn(function()
+                local character = player.Character or player.CharacterAdded:Wait()
+                if character then
+                    local rootPart = character:WaitForChild("HumanoidRootPart", 5)
+                    if rootPart then
+                        local targetCFrame = CFrame.new(0, 50, 0) -- fallback
 
-                if #spawns > 0 then
-                    -- Round robin assign spawns
-                    local spawnIndex = ((index - 1) % #spawns) + 1
-                    local chosenSpawn = spawns[spawnIndex]
+                        if #spawns > 0 then
+                            -- Round robin assign spawns
+                            local spawnIndex = ((index - 1) % #spawns) + 1
+                            local chosenSpawn = spawns[spawnIndex]
 
-                    -- Calculate exact floor placement
-                    -- Y offset = (Spawn Height / 2) + (RootPart Height / 2) + Humanoid HipHeight (which is usually around 2 studs for R15)
-                    local humanoid = character:FindFirstChild("Humanoid")
-                    local hipHeight = humanoid and humanoid.HipHeight or 2
-                    local yOffset = (chosenSpawn.Size.Y / 2) + (rootPart.Size.Y / 2) + hipHeight
+                            -- Calculate exact floor placement
+                            -- Y offset = (Spawn Height / 2) + (RootPart Height / 2) + Humanoid HipHeight (which is usually around 2 studs for R15)
+                            local humanoid = character:WaitForChild("Humanoid", 5)
+                            local hipHeight = humanoid and humanoid.HipHeight or 2
+                            local yOffset = (chosenSpawn.Size.Y / 2) + (rootPart.Size.Y / 2) + hipHeight
 
-                    targetCFrame = CFrame.new(chosenSpawn.Position + Vector3.new(0, yOffset, 0))
-                else
-                    targetCFrame = CFrame.new((index - 1) * 5, 50, 0)
+                            targetCFrame = CFrame.new(chosenSpawn.Position + Vector3.new(0, yOffset, 0))
+                        else
+                            targetCFrame = CFrame.new((index - 1) * 5, 50, 0)
+                        end
+
+                        -- Add temporary AntiCheat bypass for intentional teleport
+                        AntiCheat.SetBypass(player, "Speed", 5)
+
+                        -- Așteaptă foarte puțin ca fizica să se asigure pe noul spawn
+                        task.wait(0.1)
+                        rootPart.CFrame = targetCFrame
+                    end
                 end
-
-                -- Add temporary AntiCheat bypass for intentional teleport
-                AntiCheat.SetBypass(player, "Speed", 5)
-
-                rootPart.CFrame = targetCFrame
-            end
+            end)
         end
     end
 end
