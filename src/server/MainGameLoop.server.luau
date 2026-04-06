@@ -75,6 +75,12 @@ local function setPlayersAnchored(playersList, isAnchored)
             local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
             if rootPart then
                 rootPart.Anchored = isAnchored
+
+                -- Zero out physics momentum so they don't slide or float when unanchored
+                if isAnchored then
+                    rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    rootPart.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                end
             end
         end
     end

@@ -42,10 +42,11 @@ if dashVelocityEvent then
                 linearVelocity.RelativeTo = Enum.ActuatorRelativeTo.World
                 linearVelocity.Parent = rootPart
 
-                -- Distruge după 0.25 secunde (durata dash-ului)
-                task.delay(0.25, function()
+                -- Distruge după 0.18 secunde (durata dash-ului scurtată)
+                task.delay(0.18, function()
                     if linearVelocity then linearVelocity:Destroy() end
                     if attachment then attachment:Destroy() end
+
                     -- Oprește inerția ca să nu alunece mai departe
                     if rootPart and rootPart.Parent then
                         -- Nu tăia complet Y-ul, altfel îl oprești din cădere/bounce

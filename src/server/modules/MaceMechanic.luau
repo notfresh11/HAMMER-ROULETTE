@@ -347,12 +347,32 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
                                 local rayDirection = Vector3.new(0, -10, 0)
                                 local rayParams = RaycastParams.new()
                                 rayParams.FilterType = Enum.RaycastFilterType.Exclude
-                                rayParams.FilterDescendantsInstances = {hitChar, character, hitboxPart}
 
-                                local groundHit = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
-                                if groundHit and groundHit.Instance then
-                                    groundColor = groundHit.Instance.Color
-                                    groundMaterial = groundHit.Instance.Material
+                                local ignoreList = {hitChar, character, hitboxPart}
+                                rayParams.FilterDescendantsInstances = ignoreList
+
+                                local maxCasts = 5
+                                local casts = 0
+                                local foundGround = false
+
+                                while casts < maxCasts and not foundGround do
+                                    casts += 1
+                                    local groundHit = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+
+                                    if groundHit and groundHit.Instance then
+                                        if groundHit.Instance.Name == "PlayerSpawn" or groundHit.Instance.Name == "HammerSpawn" then
+                                            table.insert(ignoreList, groundHit.Instance)
+                                            rayParams.FilterDescendantsInstances = ignoreList
+                                            -- Adjust origin to continue casting from slightly below the hit point
+                                            rayOrigin = groundHit.Position - Vector3.new(0, 0.01, 0)
+                                        else
+                                            groundColor = groundHit.Instance.Color
+                                            groundMaterial = groundHit.Instance.Material
+                                            foundGround = true
+                                        end
+                                    else
+                                        break -- Nothing hit
+                                    end
                                 end
                             end
 

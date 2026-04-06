@@ -131,10 +131,11 @@ local function applyDash(player)
     AntiCheat.SetBypass(player, "Speed", 1)
 
     -- Apply velocity locally via RemoteEvent to bypass network ownership issues
-    local dashVelocity = rootPart.CFrame.LookVector * 150
+    -- Slightly reduced speed from 150 to 110 based on user feedback
+    local dashVelocity = rootPart.CFrame.LookVector * 110
     dashVelocityEvent:FireClient(player, dashVelocity)
 
-    -- Trail Effect
+    -- Trail Effect - Generated on the server so other players can see it!
     local attachment0 = Instance.new("Attachment", rootPart)
     attachment0.Position = Vector3.new(0, 1, 0)
     local attachment1 = Instance.new("Attachment", rootPart)
@@ -147,9 +148,15 @@ local function applyDash(player)
     trail.Lifetime = 0.5
     trail.Parent = rootPart
 
-    Debris:AddItem(trail, 1)
-    Debris:AddItem(attachment0, 1)
-    Debris:AddItem(attachment1, 1)
+    -- Disable trail generation after dash ends (0.18s) for a smooth fade out
+    task.delay(0.18, function()
+        if trail then trail.Enabled = false end
+    end)
+
+    -- Destroy completely after 0.5s to clean up memory
+    Debris:AddItem(trail, 0.5)
+    Debris:AddItem(attachment0, 0.5)
+    Debris:AddItem(attachment1, 0.5)
 end
 
 local function applyShield(player)
