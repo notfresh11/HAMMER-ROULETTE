@@ -765,10 +765,14 @@ local hideText = ReplicatedStorage:WaitForChild("HideTextEvent", 10)
 local vfxEvent = ReplicatedStorage:WaitForChild("VfxEvent", 10)
 
 -- Funcție Helper VFX Client
-local function runClientVfx(victimPos, victimColors)
+local function runClientVfx(victimPos, victimColors, groundColor, groundMaterial)
     local Workspace = game:GetService("Workspace")
     local TweenService = game:GetService("TweenService")
     local Debris = game:GetService("Debris")
+
+    -- Fallbacks
+    groundColor = groundColor or Color3.fromRGB(100, 100, 100)
+    groundMaterial = groundMaterial or Enum.Material.Slate
 
     -- 1. Explozia de cuburi a victimei
     for _, partColor in ipairs(victimColors) do
@@ -797,8 +801,8 @@ local function runClientVfx(victimPos, victimColors)
 
         local rock = Instance.new("Part")
         rock.Size = Vector3.new(2, 2, 2)
-        rock.Color = Color3.fromRGB(100, 100, 100)
-        rock.Material = Enum.Material.Slate
+        rock.Color = groundColor
+        rock.Material = groundMaterial
         rock.Position = victimPos + offset
         rock.Anchored = true
         rock.CanCollide = false
@@ -862,8 +866,8 @@ local function runClientVfx(victimPos, victimColors)
 end
 
 if vfxEvent then
-    vfxEvent.OnClientEvent:Connect(function(victimPos, victimColors)
-        runClientVfx(victimPos, victimColors)
+    vfxEvent.OnClientEvent:Connect(function(victimPos, victimColors, groundColor, groundMaterial)
+        runClientVfx(victimPos, victimColors, groundColor, groundMaterial)
     end)
 end
 

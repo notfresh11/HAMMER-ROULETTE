@@ -150,6 +150,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
     -- We will assume standard Roblox physics.
 
     local isFalling = false
+    local fallStartTick = 0
 
     -- Create Permanent Hitbox Part
     local hitboxPart = Instance.new("Part")
@@ -212,6 +213,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
     table.insert(connections, humanoid.StateChanged:Connect(function(oldState, newState)
         if newState == Enum.HumanoidStateType.Freefall then
             isFalling = true
+            fallStartTick = tick()
             trail.Enabled = true
             -- Imediat ce e în aer, îi tăiem JumpHeight ca să nu poată ține Space apăsat la nesfârșit (Bunny Hop)
             humanoid.JumpHeight = 0
@@ -230,7 +232,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
         -- Floor detection via raycast to be perfectly certain they touched the ground
         if isFalling and humanoid.Health > 0 and rootPart then
             -- Only check for landing if we are actually falling downwards (or at the peak of jump)
-            if rootPart.AssemblyLinearVelocity.Y <= 0 then
+            -- And ensure a grace period has passed since we started falling/jumping (0.15 seconds)
+            if rootPart.AssemblyLinearVelocity.Y <= 0 and (tick() - fallStartTick > 0.15) then
                 -- Set up raycast params to ignore the character itself
                 local rayParams = RaycastParams.new()
                 rayParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -334,11 +337,29 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
                                 end
                             end
 
+                            -- Detect ground material and color for dynamic VFX
+                            local groundColor = Color3.fromRGB(100, 100, 100) -- Default Grey Slate
+                            local groundMaterial = Enum.Material.Slate
+                            local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
+
+                            if targetRoot then
+                                local rayOrigin = targetRoot.Position
+                                local rayDirection = Vector3.new(0, -10, 0)
+                                local rayParams = RaycastParams.new()
+                                rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                                rayParams.FilterDescendantsInstances = {hitChar, character, hitboxPart}
+
+                                local groundHit = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+                                if groundHit and groundHit.Instance then
+                                    groundColor = groundHit.Instance.Color
+                                    groundMaterial = groundHit.Instance.Material
+                                end
+                            end
+
                             -- Trigger VFX pe toți clienții
                             local vfxEvent = ReplicatedStorage:FindFirstChild("VfxEvent")
-                            local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
                             if targetRoot and vfxEvent then
-                                vfxEvent:FireAllClients(targetRoot.Position, victimColors)
+                                vfxEvent:FireAllClients(targetRoot.Position, victimColors, groundColor, groundMaterial)
                             end
                         end
 
