@@ -329,6 +329,14 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
 
         if now - lastHitTick < AUTO_HIT_COOLDOWN then return end
 
+        -- Verificăm de cât timp este în aer (trebuie să fi trecut o fracțiune de secundă pentru a nu omorî fix la săritură)
+        -- și forțăm jucătorul să fie măcar în partea superioară a săriturii sau în coborâre
+        local timeSinceJump = now - fallStartTick
+        if timeSinceJump < 0.25 and rootPart.AssemblyLinearVelocity.Y > 10 then
+            -- Prea devreme după săritură și încă se ridică cu viteză mare
+            return
+        end
+
         local boxSize = hitboxPart.Size
         local boxCFrame = hitboxPart.CFrame
 
