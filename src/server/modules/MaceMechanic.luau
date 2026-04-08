@@ -19,15 +19,19 @@ local hitSoundIds = {
     "rbxassetid://108830942760951"
 }
 local lastHitSoundIndex = 0
+local rng = Random.new()
 
 -- Helper function to play a 3D random hit sound without repeating the same one twice
 local function playRandomHitSound(parentPart)
     if #hitSoundIds == 0 or not parentPart then return end
 
-    local randomIndex = math.random(1, #hitSoundIds)
-    -- Asigură-te că nu e la fel cu ultimul redat
+    local randomIndex = rng:NextInteger(1, #hitSoundIds)
+    -- Asigură-te că nu e la fel cu ultimul redat (și forțează selecția unui altul dacă este la fel)
     if #hitSoundIds > 1 and randomIndex == lastHitSoundIndex then
-        randomIndex = (randomIndex % #hitSoundIds) + 1
+        randomIndex = randomIndex + 1
+        if randomIndex > #hitSoundIds then
+            randomIndex = 1
+        end
     end
     lastHitSoundIndex = randomIndex
 
@@ -511,6 +515,9 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
                         hitRegistered = true
                         lastHitTick = tick()
 
+                        -- Pentru a ne asigura că hit-soundul se va auzi perfect pe poziția decesului,
+                        -- pasăm un CFrame / Poziție din personaj înainte de a fi ascuns.
+                        -- Funcția folosește doar coordonatele pentru crearea Part-ului invizibil.
                         local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
                         if targetRoot then
                             playRandomHitSound(targetRoot)
@@ -553,12 +560,6 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
                         local victimColors = {}
                         if isTraining then
                             print(player.Name .. " a distrus un Dummy (Auto-Hit) pe platforma de antrenament!")
-
-                            -- Pentru a ne asigura ca se aude sunetul, cautam RootPart si il redam inainte de a distruge partile!
-                            local dRoot = hitChar:FindFirstChild("HumanoidRootPart")
-                            if dRoot then
-                                playRandomHitSound(dRoot)
-                            end
 
                             -- Just collect colors for VFX
                             for _, p in ipairs(hitChar:GetDescendants()) do
