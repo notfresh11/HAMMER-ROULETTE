@@ -289,21 +289,24 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
 
     table.insert(connections, humanoid.StateChanged:Connect(function(oldState, newState)
         if newState == Enum.HumanoidStateType.Freefall then
-            isFalling = true
-            fallStartTick = tick()
-            maxJumpY = rootPart and rootPart.Position.Y or 0
-            trail.Enabled = true
-            -- Imediat ce e în aer, îi tăiem JumpHeight ca să nu poată ține Space apăsat la nesfârșit (Bunny Hop)
-            if not isTraining then
-                humanoid.JumpHeight = 0
-            else
-                -- În momentul în care sare, înregistrăm cooldown-ul DOAR dacă a avut jump boost (JumpHeight == 40)
-                -- și nu era deja pe cooldown
-                local userId = player.UserId
-                if humanoid.JumpHeight > 30 then
-                    MaceMechanic.jumpCooldowns[userId] = tick()
-                    -- Jump-ul următor (până trec 10s) va fi mic
-                    humanoid.JumpHeight = 7.2
+            -- Prevenim resetarea infinită a timpului de cădere pe terenuri denivelate/bumpy (unde caracterul intră și iese constant din Freefall)
+            if not isFalling then
+                isFalling = true
+                fallStartTick = tick()
+                maxJumpY = rootPart and rootPart.Position.Y or 0
+                trail.Enabled = true
+                -- Imediat ce e în aer, îi tăiem JumpHeight ca să nu poată ține Space apăsat la nesfârșit (Bunny Hop)
+                if not isTraining then
+                    humanoid.JumpHeight = 0
+                else
+                    -- În momentul în care sare, înregistrăm cooldown-ul DOAR dacă a avut jump boost (JumpHeight == 40)
+                    -- și nu era deja pe cooldown
+                    local userId = player.UserId
+                    if humanoid.JumpHeight > 30 then
+                        MaceMechanic.jumpCooldowns[userId] = tick()
+                        -- Jump-ul următor (până trec 10s) va fi mic
+                        humanoid.JumpHeight = 7.2
+                    end
                 end
             end
         end
@@ -352,7 +355,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                     rayParams.FilterDescendantsInstances = {character, hitboxPart}
 
                     local boxSize = Vector3.new(2, 0.1, 2) -- Covers the width of the character's feet
-                    local boxCFrame = rootPart.CFrame
+                    -- Garantăm că blocul este aliniat plat pe axele globale pentru a nu se lovi pe sine din greșeală dacă RootPart este înclinat
+                    local boxCFrame = CFrame.new(rootPart.Position)
                     -- 4.5 stud depth is large enough to cover HipHeight + minor terrain variations
                     local rayDirection = Vector3.new(0, -4.5, 0)
                     local raycastResult = Workspace:Blockcast(boxCFrame, boxSize, rayDirection, rayParams)
@@ -739,6 +743,10 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
             end
 
             isFalling = true
+            -- Resetăm intenționat tick-ul aici pentru a-i oferi invulnerabilitate la ground-check în timpul noului bounce
+            fallStartTick = tick()
+            maxJumpY = rootPart and rootPart.Position.Y or 0
+
             -- Îi redăm posibilitatea de jump pentru viitoarea cădere, deși bounce-ul deja îl forțează în sus
             if humanoid.JumpHeight == 0 then
                 humanoid.JumpHeight = 40
