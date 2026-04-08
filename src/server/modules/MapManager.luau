@@ -102,6 +102,10 @@ function MapManager.cleanupCurrentMap()
     end
 end
 
+function MapManager.getCurrentMap()
+    return currentMapInstance
+end
+
 function MapManager.chooseAndSpawnMap()
     MapManager.cleanupCurrentMap()
 
