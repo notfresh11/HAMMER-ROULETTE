@@ -333,20 +333,34 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
             maxJumpY = rootPart.Position.Y
         end
 
-        -- 3. Detect Landing
+        -- 3. Detect Landing via FallZone
         if hasStartedFalling and humanoid.Health > 0 and rootPart then
             -- Oferim un grace period de 0.3 secunde de la momentul desprinderii de la sol pentru a nu se opri runda instant in momentul sariturii
             if (tick() - fallStartTick > 0.3) then
                 local isOnGround = false
 
-                -- Verificările cerute: dacă merge (Running), dacă pur și simplu nu cade (FloorMaterial valid)
-                if currentState == Enum.HumanoidStateType.Running or currentState == Enum.HumanoidStateType.Landed then
-                    isOnGround = true
-                elseif humanoid.FloorMaterial ~= Enum.Material.Air then
-                    isOnGround = true
-                elseif rootPart.AssemblyLinearVelocity.Y >= -0.5 and rootPart.AssemblyLinearVelocity.Y <= 0.5 then
-                    -- Dacă viteza Y e 0 și stă pe loc, sigur e pe un obiect
-                    isOnGround = true
+                -- Detect landing exclusively by checking if the player is inside the "FallZone"
+                local MapManager = require(script.Parent.MapManager)
+                local currentMap = MapManager.getCurrentMap()
+
+                if currentMap then
+                    local fallZone = currentMap:FindFirstChild("FallZone", true)
+                    if fallZone and fallZone:IsA("BasePart") then
+                        -- Use OverlapParams to strictly check if the player's RootPart intersects the FallZone
+                        local overlapParams = OverlapParams.new()
+                        overlapParams.FilterType = Enum.RaycastFilterType.Include
+                        overlapParams.FilterDescendantsInstances = {rootPart}
+
+                        local partsInZone = Workspace:GetPartsInPart(fallZone, overlapParams)
+                        if #partsInZone > 0 then
+                            isOnGround = true
+                        end
+                    else
+                        -- Fallback just in case the map builder forgot to add FallZone, fall back to simple Y velocity check to prevent permanent softlock
+                        if rootPart.AssemblyLinearVelocity.Y >= -0.5 and rootPart.AssemblyLinearVelocity.Y <= 0.5 then
+                            isOnGround = true
+                        end
+                    end
                 end
 
                 if isOnGround and not pendingLandingEnd then
@@ -361,7 +375,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                     else
                         pendingLandingEnd = task.delay(0.1, function()
                             if roundActive then
-                                print(player.Name .. " a aterizat pe podea conform logicii simplificate.")
+                                print(player.Name .. " a aterizat in FallZone. Runda s-a incheiat.")
                                 cleanup()
                                 onRoundEndCallback()
                             end
