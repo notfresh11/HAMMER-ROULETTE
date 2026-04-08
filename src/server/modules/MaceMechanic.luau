@@ -346,10 +346,11 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                 if currentMap then
                     local fallZone = currentMap:FindFirstChild("FallZone", true)
                     if fallZone and fallZone:IsA("BasePart") then
-                        -- Use OverlapParams to strictly check if the player's RootPart intersects the FallZone
+                        -- Use OverlapParams to strictly check if any part of the player's Character (like feet) intersects the FallZone
                         local overlapParams = OverlapParams.new()
                         overlapParams.FilterType = Enum.RaycastFilterType.Include
-                        overlapParams.FilterDescendantsInstances = {rootPart}
+                        -- Include the entire character so feet/legs overlapping the thin FallZone can be detected
+                        overlapParams.FilterDescendantsInstances = character:GetChildren()
 
                         local partsInZone = Workspace:GetPartsInPart(fallZone, overlapParams)
                         if #partsInZone > 0 then
