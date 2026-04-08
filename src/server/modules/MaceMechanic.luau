@@ -203,7 +203,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
     -- In standard Roblox, fall damage isn't applied unless specifically scripted.
     -- We will assume standard Roblox physics.
 
-    local isFalling = false
+    local hasStartedFalling = false
     local fallStartTick = 0
     local maxJumpY = 0 -- Reține înălțimea maximă atinsă în săritură pentru a preveni kill-urile false
     local AUTO_HIT_COOLDOWN = 0.5
@@ -287,34 +287,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
 
     -- Track jumping/falling
 
-    table.insert(connections, humanoid.StateChanged:Connect(function(oldState, newState)
-        if newState == Enum.HumanoidStateType.Freefall then
-            -- Prevenim resetarea infinită a timpului de cădere pe terenuri denivelate/bumpy (unde caracterul intră și iese constant din Freefall)
-            if not isFalling then
-                isFalling = true
-                fallStartTick = tick()
-                maxJumpY = rootPart and rootPart.Position.Y or 0
-                trail.Enabled = true
-                -- Imediat ce e în aer, îi tăiem JumpHeight ca să nu poată ține Space apăsat la nesfârșit (Bunny Hop)
-                if not isTraining then
-                    humanoid.JumpHeight = 0
-                else
-                    -- În momentul în care sare, înregistrăm cooldown-ul DOAR dacă a avut jump boost (JumpHeight == 40)
-                    -- și nu era deja pe cooldown
-                    local userId = player.UserId
-                    if humanoid.JumpHeight > 30 then
-                        MaceMechanic.jumpCooldowns[userId] = tick()
-                        -- Jump-ul următor (până trec 10s) va fi mic
-                        humanoid.JumpHeight = 7.2
-                    end
-                end
-            end
-        end
-    end))
-
     -- Spatial query attack logic - AUTO HIT
-    local lastHitTick = 0
-    local AUTO_HIT_COOLDOWN = 0.5 -- prevent double hits on same frame
 
     table.insert(connections, RunService.Heartbeat:Connect(function()
         if not roundActive or not player then return end
@@ -333,67 +306,67 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
             end
         end
 
-        -- Floor detection to be perfectly certain they touched the ground
-        if isFalling and humanoid.Health > 0 and rootPart then
-            -- Ensure a grace period has passed since we started falling/jumping (0.20 seconds)
-            -- We entirely remove the Y velocity check. If a player is physically intersecting the ground after 0.2 seconds,
-            -- they have landed, regardless of whatever chaotic bounce velocity the Roblox engine is applying to them from the Union.
-            if tick() - fallStartTick > 0.20 then
-                local isOnGround = false
-                local currentState = humanoid:GetState()
+        local currentState = humanoid:GetState()
+        local isCurrentlyInAir = (humanoid.FloorMaterial == Enum.Material.Air) or (currentState == Enum.HumanoidStateType.Freefall)
 
-                -- Fast path: Engine officially declares we are on the floor
-                if currentState == Enum.HumanoidStateType.Landed or currentState == Enum.HumanoidStateType.Running then
+        -- 1. Detect if the player has started jumping/falling
+        if not hasStartedFalling then
+            if isCurrentlyInAir then
+                hasStartedFalling = true
+                fallStartTick = tick()
+                maxJumpY = rootPart and rootPart.Position.Y or 0
+                trail.Enabled = true
+
+                -- Tăiem JumpHeight ca să nu poată ține Space apăsat la nesfârșit (Bunny Hop)
+                if not isTraining then
+                    humanoid.JumpHeight = 0
+                else
+                    local userId = player.UserId
+                    if humanoid.JumpHeight > 30 then
+                        MaceMechanic.jumpCooldowns[userId] = tick()
+                        humanoid.JumpHeight = 7.2
+                    end
+                end
+            end
+
+            -- If they haven't jumped yet, we still check for hits in case they walk into someone
+            -- But we don't end the round.
+        end
+
+        -- 2. Once they are in the air, update max height
+        if hasStartedFalling and isCurrentlyInAir and rootPart and rootPart.Position.Y > maxJumpY then
+            maxJumpY = rootPart.Position.Y
+        end
+
+        -- 3. Detect Landing
+        if hasStartedFalling and humanoid.Health > 0 and rootPart then
+            -- Oferim un grace period de 0.3 secunde de la momentul desprinderii de la sol pentru a nu se opri runda instant in momentul sariturii
+            if (tick() - fallStartTick > 0.3) then
+                local isOnGround = false
+
+                -- Verificările cerute: dacă merge (Running), dacă pur și simplu nu cade (FloorMaterial valid)
+                if currentState == Enum.HumanoidStateType.Running or currentState == Enum.HumanoidStateType.Landed then
                     isOnGround = true
                 elseif humanoid.FloorMaterial ~= Enum.Material.Air then
                     isOnGround = true
-                end
-
-                if not isOnGround then
-                    -- Ultimate fallback: Use GetPartBoundsInBox for thick spatial detection.
-                    -- Raycasts and Blockcasts FAIL completely if their origin point clips inside a complex Union floor.
-                    -- A spatial query detects intersection no matter what, preventing clipping fall-throughs.
-
-                    local overlapParams = OverlapParams.new()
-                    overlapParams.FilterType = Enum.RaycastFilterType.Exclude
-                    overlapParams.FilterDescendantsInstances = {character, hitboxPart}
-
-                    local hipHeight = humanoid.HipHeight or 2
-                    -- Centram cutia de detectie fix sub picioare, cu o grosime verticală considerabilă (1.5) pt a prinde orice clip în podea
-                    local boxCFrame = CFrame.new(rootPart.Position - Vector3.new(0, (rootPart.Size.Y / 2) + hipHeight, 0))
-                    local boxSize = Vector3.new(2.5, 1.5, 2.5)
-
-                    local partsInFloorBox = Workspace:GetPartBoundsInBox(boxCFrame, boxSize, overlapParams)
-
-                    -- Orice obiect lovit care poate avea coliziuni fizice ne indică o podea validă
-                    if #partsInFloorBox > 0 then
-                        for _, floorPart in ipairs(partsInFloorBox) do
-                            if floorPart.CanCollide then
-                                isOnGround = true
-                                break
-                            end
-                        end
-                    end
+                elseif rootPart.AssemblyLinearVelocity.Y >= -0.5 and rootPart.AssemblyLinearVelocity.Y <= 0.5 then
+                    -- Dacă viteza Y e 0 și stă pe loc, sigur e pe un obiect
+                    isOnGround = true
                 end
 
                 if isOnGround and not pendingLandingEnd then
-                    -- They touched the ground.
                     trail.Enabled = false
-                    isFalling = false
-
-                    -- Resetam inaltimea pentru a nu pastra fallDistance ridicat cand ramane pe sol
+                    hasStartedFalling = false
                     maxJumpY = rootPart.Position.Y
 
                     if isTraining then
-                        -- În training, doar resetăm starea de cădere (și JumpHeight la fel cu starea normală)
                         if humanoid then
                             humanoid.JumpHeight = 7.2
                         end
                     else
-                        -- Margin de milisecunde pentru a prinde lovituri la milimetru de sol
                         pendingLandingEnd = task.delay(0.1, function()
                             if roundActive then
-                                print(player.Name .. " a aterizat pe podea.")
+                                print(player.Name .. " a aterizat pe podea conform logicii simplificate.")
                                 cleanup()
                                 onRoundEndCallback()
                             end
@@ -403,13 +376,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
             end
         end
 
-        -- Actualizăm mereu maxJumpY cât timp urcă în aer
-        if isFalling and rootPart and rootPart.Position.Y > maxJumpY then
-            maxJumpY = rootPart.Position.Y
-        end
-
-        if not isFalling and not pendingLandingEnd then
-            return
+        if not hasStartedFalling and not pendingLandingEnd then
+            -- They haven't jumped yet, but we allow auto-hits if they walk into someone
         end
 
         if now - lastHitTick < AUTO_HIT_COOLDOWN then return end
@@ -746,18 +714,15 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
         end
 
         if hitRegistered then
-            -- Anulăm oprirea rundei dacă a lovit fix la aterizare
             if pendingLandingEnd then
                 task.cancel(pendingLandingEnd)
                 pendingLandingEnd = nil
             end
 
-            isFalling = true
-            -- Resetăm intenționat tick-ul aici pentru a-i oferi invulnerabilitate la ground-check în timpul noului bounce
+            hasStartedFalling = true
             fallStartTick = tick()
             maxJumpY = rootPart and rootPart.Position.Y or 0
 
-            -- Îi redăm posibilitatea de jump pentru viitoarea cădere, deși bounce-ul deja îl forțează în sus
             if humanoid.JumpHeight == 0 then
                 humanoid.JumpHeight = 40
             end
