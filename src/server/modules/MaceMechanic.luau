@@ -333,42 +333,30 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
             maxJumpY = rootPart.Position.Y
         end
 
-        -- 3. Detect Landing via FallZone
+        -- 3. Detect Landing on the floor
         if hasStartedFalling and humanoid.Health > 0 and rootPart then
-            -- Oferim un grace period de 0.3 secunde de la momentul desprinderii de la sol pentru a nu se opri runda instant in momentul sariturii
-            if (tick() - fallStartTick > 0.3) then
+            -- Grace period de 0.35 secunde pentru a permite corpului sa părăsească solul înainte de a citi din nou coliziunea
+            if (tick() - fallStartTick > 0.35) then
                 local isOnGround = false
 
-                -- Detect landing exclusively by checking if the player is inside the "FallZone"
-                local MapManager = require(script.Parent.MapManager)
-                local currentMap = MapManager.getCurrentMap()
-
-                if currentMap then
-                    local fallZone = currentMap:FindFirstChild("FallZone", true)
-                    if fallZone and fallZone:IsA("BasePart") then
-                        -- Use OverlapParams to strictly check if any part of the player's Character (like feet) intersects the FallZone
-                        local overlapParams = OverlapParams.new()
-                        overlapParams.FilterType = Enum.RaycastFilterType.Include
-                        -- Include the entire character so feet/legs overlapping the thin FallZone can be detected
-                        overlapParams.FilterDescendantsInstances = character:GetChildren()
-
-                        local partsInZone = Workspace:GetPartsInPart(fallZone, overlapParams)
-                        if #partsInZone > 0 then
-                            isOnGround = true
-                        else
-                            -- Fallback to Raycast: Shoot a ray strictly downwards from the RootPart to see if FallZone is directly beneath the feet
-                            local rayParams = RaycastParams.new()
-                            rayParams.FilterType = Enum.RaycastFilterType.Include
-                            rayParams.FilterDescendantsInstances = {fallZone}
-                            -- We can raycast even against CanCollide=false parts.
-                            local rayHit = Workspace:Raycast(rootPart.Position, Vector3.new(0, -6, 0), rayParams)
-                            if rayHit and rayHit.Instance == fallZone then
+                -- Ne asiguram ca e in coborare sau stationar pe Y (nu inca in ascensiune)
+                if rootPart.AssemblyLinearVelocity.Y <= 0.1 then
+                    -- Metoda principala si cea mai fidela din Roblox: FloorMaterial
+                    -- FloorMaterial se actualizează automat cand jucatorul se sprijina pe orice fel de part cu coliziune
+                    if humanoid.FloorMaterial ~= Enum.Material.Air then
+                        isOnGround = true
+                    else
+                        -- Fallback Raycast de siguranta de 3.5 studs in jos (pentru zone unde FloorMaterial poate face figuri din cauza custom animations)
+                        local rayParams = RaycastParams.new()
+                        rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                        rayParams.FilterDescendantsInstances = {character, hitboxPart}
+                        local rayHit = Workspace:Raycast(rootPart.Position, Vector3.new(0, -3.5, 0), rayParams)
+                        if rayHit and rayHit.Instance and not rayHit.Instance.CanCollide then
+                            -- Chiar si daca a atins ceva fara coliziune (ex: FallZone trigger), oprim
+                            if rayHit.Instance.Name == "FallZone" then
                                 isOnGround = true
                             end
-                        end
-                    else
-                        -- Fallback just in case the map builder forgot to add FallZone, fall back to simple Y velocity check to prevent permanent softlock
-                        if rootPart.AssemblyLinearVelocity.Y >= -0.5 and rootPart.AssemblyLinearVelocity.Y <= 0.5 then
+                        elseif rayHit and rayHit.Instance and rayHit.Instance.CanCollide then
                             isOnGround = true
                         end
                     end
@@ -384,9 +372,9 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                             humanoid.JumpHeight = 7.2
                         end
                     else
-                        pendingLandingEnd = task.delay(0.1, function()
+                        pendingLandingEnd = task.delay(0.05, function()
                             if roundActive then
-                                print(player.Name .. " a aterizat in FallZone. Runda s-a incheiat.")
+                                print(player.Name .. " a aterizat. Runda s-a incheiat.")
                                 cleanup()
                                 onRoundEndCallback()
                             end
