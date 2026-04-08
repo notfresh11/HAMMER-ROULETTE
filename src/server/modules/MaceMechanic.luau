@@ -333,30 +333,35 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
             maxJumpY = rootPart.Position.Y
         end
 
-        -- 3. Detect Landing on the floor
+        -- 3. Detect Landing on the floor (Any surface)
         if hasStartedFalling and humanoid.Health > 0 and rootPart then
-            -- Grace period de 0.35 secunde pentru a permite corpului sa părăsească solul înainte de a citi din nou coliziunea
-            if (tick() - fallStartTick > 0.35) then
-                local isOnGround = false
+            -- Position-based grace period: Jucătorul trebuie să fi coborât cel puțin 0.5 studs de la înălțimea maximă atinsă
+            -- SAU să fi trecut măcar 0.25 secunde de la momentul săriturii pentru a ieși din frame-ul inițial de la sol
+            local timeSinceJump = tick() - fallStartTick
+            local fallDistance = maxJumpY - rootPart.Position.Y
 
-                -- Ne asiguram ca e in coborare sau stationar pe Y (nu inca in ascensiune)
+            if (timeSinceJump > 0.25) or (fallDistance > 0.5) then
+                -- Verificam daca jucatorul se afla strict intr-o miscare de coborare fizica reala sau e oprit
                 if rootPart.AssemblyLinearVelocity.Y <= 0.1 then
-                    -- Metoda principala si cea mai fidela din Roblox: FloorMaterial
-                    -- FloorMaterial se actualizează automat cand jucatorul se sprijina pe orice fel de part cu coliziune
+                    local isOnGround = false
+
                     if humanoid.FloorMaterial ~= Enum.Material.Air then
-                        isOnGround = true
-                    else
-                        -- Fallback Raycast de siguranta de 3.5 studs in jos (pentru zone unde FloorMaterial poate face figuri din cauza custom animations)
-                        local rayParams = RaycastParams.new()
-                        rayParams.FilterType = Enum.RaycastFilterType.Exclude
-                        rayParams.FilterDescendantsInstances = {character, hitboxPart}
-                        local rayHit = Workspace:Raycast(rootPart.Position, Vector3.new(0, -3.5, 0), rayParams)
-                        if rayHit and rayHit.Instance and not rayHit.Instance.CanCollide then
-                            -- Chiar si daca a atins ceva fara coliziune (ex: FallZone trigger), oprim
-                            if rayHit.Instance.Name == "FallZone" then
-                                isOnGround = true
-                            end
-                        elseif rayHit and rayHit.Instance and rayHit.Instance.CanCollide then
+                    isOnGround = true
+                else
+                    -- Fallback puternic pentru zone subtiri/fara coliziune cum e FallZone
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+                    local ignoreList = {character}
+                    if hitboxPart then
+                        table.insert(ignoreList, hitboxPart)
+                    end
+                    rayParams.FilterDescendantsInstances = ignoreList
+
+                    local rayHit = Workspace:Raycast(rootPart.Position, Vector3.new(0, -3.5, 0), rayParams)
+                    if rayHit and rayHit.Instance then
+                        -- Daca lovim ORICE pe raycast care e pamant sau "FallZone", e aterizare
+                        if rayHit.Instance.CanCollide or rayHit.Instance.Name == "FallZone" then
                             isOnGround = true
                         end
                     end
@@ -374,12 +379,15 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                     else
                         pendingLandingEnd = task.delay(0.05, function()
                             if roundActive then
-                                print(player.Name .. " a aterizat. Runda s-a incheiat.")
+                                print(player.Name .. " a aterizat si runda se reseteaza!")
                                 cleanup()
-                                onRoundEndCallback()
+                                if onRoundEndCallback then
+                                    onRoundEndCallback()
+                                end
                             end
                         end)
                     end
+                end
                 end
             end
         end
