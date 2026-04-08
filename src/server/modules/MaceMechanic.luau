@@ -475,7 +475,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
                                     local groundHit = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
 
                                     if groundHit and groundHit.Instance then
-                                        if groundHit.Instance.Name == "PlayerSpawn" or groundHit.Instance.Name == "HammerSpawn" then
+                                    if groundHit.Instance.Transparency == 1 or groundHit.Instance.Name == "Zone" or groundHit.Instance.Name == "PlayerSpawn" or groundHit.Instance.Name == "HammerSpawn" then
                                             table.insert(ignoreList, groundHit.Instance)
                                             rayParams.FilterDescendantsInstances = ignoreList
                                             -- Adjust origin to continue casting from slightly below the hit point
@@ -544,6 +544,12 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
                         if isTraining then
                             print(player.Name .. " a distrus un Dummy (Auto-Hit) pe platforma de antrenament!")
 
+                            -- Pentru a ne asigura ca se aude sunetul, cautam RootPart si il redam inainte de a distruge partile!
+                            local dRoot = hitChar:FindFirstChild("HumanoidRootPart")
+                            if dRoot then
+                                playRandomHitSound(dRoot)
+                            end
+
                             -- Just collect colors for VFX
                             for _, p in ipairs(hitChar:GetDescendants()) do
                                 if p:IsA("BasePart") then
@@ -583,7 +589,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
                                 local groundHit = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
 
                                 if groundHit and groundHit.Instance then
-                                    if groundHit.Instance.Name == "PlayerSpawn" or groundHit.Instance.Name == "HammerSpawn" or groundHit.Instance.Name == "Platform" then
+                                    if groundHit.Instance.Transparency == 1 or groundHit.Instance.Name == "Zone" or groundHit.Instance.Name == "PlayerSpawn" or groundHit.Instance.Name == "HammerSpawn" then
                                         table.insert(ignoreList, groundHit.Instance)
                                         rayParams.FilterDescendantsInstances = ignoreList
                                         rayOrigin = groundHit.Position - Vector3.new(0, 0.01, 0)

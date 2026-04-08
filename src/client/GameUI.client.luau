@@ -802,7 +802,8 @@ local function runClientVfx(victimPos, victimColors, groundColor, groundMaterial
     -- 2. Ground Smash (Crater Ring)
     for i = 1, 8 do
         local angle = (math.pi * 2 / 8) * i
-        local offset = Vector3.new(math.cos(angle) * 4, -2, math.sin(angle) * 4)
+        -- Ajustăm adâncimea de pornire
+        local offset = Vector3.new(math.cos(angle) * 4, -1.5, math.sin(angle) * 4)
 
         local rock = Instance.new("Part")
         rock.Size = Vector3.new(2, 2, 2)
@@ -813,14 +814,24 @@ local function runClientVfx(victimPos, victimColors, groundColor, groundMaterial
         rock.CanCollide = false
         rock.Parent = Workspace
 
-        -- Ridicăm pietrele din pământ și le rotim random
-        local upCFrame = CFrame.new(victimPos + offset + Vector3.new(0, 3, 0)) * CFrame.Angles(math.random(), math.random(), math.random())
-        local rockTween = TweenService:Create(rock, TweenInfo.new(0.3, Enum.EasingStyle.Bounce), {CFrame = upCFrame})
+        -- Le ridicăm doar parțial ca să rămână înfipte în pământ (lipite)
+        -- Reducem înălțimea Y de la 3 la 0.8
+        local targetPos = victimPos + offset + Vector3.new(0, 0.8, 0)
+
+        -- Folosim o rotație aleatorie doar pe axele X și Z pentru a părea ca pământ crăpat/ieșit în afară
+        local randX = math.random() * math.pi/4 -- rotație mică max 45 grade
+        local randZ = math.random() * math.pi/4
+        local randY = math.random() * math.pi * 2 -- rotatie libera pe orizontala
+
+        local upCFrame = CFrame.new(targetPos) * CFrame.Angles(randX, randY, randZ)
+
+        -- Folosim EasingStyle.Elastic sau Quad out pt a părea grele și ancorate
+        local rockTween = TweenService:Create(rock, TweenInfo.new(0.15, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {CFrame = upCFrame})
         rockTween:Play()
 
-        -- Se scufundă la loc și dispar
+        -- Se scufundă la loc și dispar treptat
         task.delay(1.5, function()
-            local downTween = TweenService:Create(rock, TweenInfo.new(0.5), {Position = rock.Position - Vector3.new(0,5,0), Transparency = 1})
+            local downTween = TweenService:Create(rock, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = rock.Position - Vector3.new(0, 3, 0), Transparency = 1})
             downTween:Play()
         end)
         Debris:AddItem(rock, 2.5)
