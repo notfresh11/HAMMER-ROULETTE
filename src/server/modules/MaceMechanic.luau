@@ -19,13 +19,15 @@ local hitSoundIds = {
     "rbxassetid://108830942760951"
 }
 local lastHitSoundIndex = 0
-local rng = Random.new()
 
 -- Helper function to play a 3D random hit sound without repeating the same one twice
 local function playRandomHitSound(parentPart)
     if #hitSoundIds == 0 or not parentPart then return end
 
+    -- Use a fresh random seed based on tick to guarantee entropy
+    local rng = Random.new(math.floor(tick() * 1000) % 100000)
     local randomIndex = rng:NextInteger(1, #hitSoundIds)
+
     -- Asigură-te că nu e la fel cu ultimul redat (și forțează selecția unui altul dacă este la fel)
     if #hitSoundIds > 1 and randomIndex == lastHitSoundIndex then
         randomIndex = randomIndex + 1
@@ -49,10 +51,11 @@ local function playRandomHitSound(parentPart)
     hitSound.SoundId = hitSoundIds[randomIndex]
     hitSound.RollOffMaxDistance = 150 -- Distanța la care se aude
     hitSound.Volume = 1
-    hitSound.Parent = soundAnchor
 
-    -- Eliminăm primele secunde "mute" din asset pentru a rezolva problema delay-ului
-    hitSound.TimePosition = 0.2
+    -- Slight pitch variation for extra diversity
+    hitSound.PlaybackSpeed = rng:NextNumber(0.9, 1.1)
+
+    hitSound.Parent = soundAnchor
 
     hitSound:Play()
 
