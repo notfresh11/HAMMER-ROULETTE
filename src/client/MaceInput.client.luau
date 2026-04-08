@@ -17,6 +17,18 @@ if bounceEvent then
             local rootPart = character:FindFirstChild("HumanoidRootPart")
             local humanoid = character:FindFirstChild("Humanoid")
             if rootPart and humanoid then
+                -- Serverul ancorează personajul timp de 0.08 secunde la hit-pause, iar apoi trimite bounceEvent-ul.
+                -- Deseori semnalul ajunge la client cu o microsecundă înainte să se replice Anchored = false,
+                -- anulând complet aplicarea AssemblyLinearVelocity. Așteptăm ca part-ul să se deancoreze!
+                if rootPart.Anchored then
+                    print("MaceInput: RootPart este ancorat, aștept deancorarea înainte de Bounce...")
+                    local startWait = tick()
+                    -- Așteptăm maxim 0.2 secunde (ca fail-safe)
+                    while rootPart.Anchored and tick() - startWait < 0.2 do
+                        task.wait()
+                    end
+                end
+
                 -- Oprim inerția curentă de mișcare complet (pentru a evita ca forțele existente să se adauge la bounce și să creeze inconsecvențe)
                 rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, 0, rootPart.AssemblyLinearVelocity.Z)
 

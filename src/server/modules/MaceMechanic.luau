@@ -168,6 +168,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
 
     local isFalling = false
     local fallStartTick = 0
+    local maxJumpY = 0 -- Reține înălțimea maximă atinsă în săritură pentru a preveni kill-urile false
     local AUTO_HIT_COOLDOWN = 0.5
     local lastHitTick = 0
 
@@ -246,6 +247,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
         if newState == Enum.HumanoidStateType.Freefall then
             isFalling = true
             fallStartTick = tick()
+            maxJumpY = rootPart and rootPart.Position.Y or 0
             trail.Enabled = true
             -- Imediat ce e în aer, îi tăiem JumpHeight ca să nu poată ține Space apăsat la nesfârșit (Bunny Hop)
             if not isTraining then
@@ -323,6 +325,11 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
             end
         end
 
+        -- Actualizăm mereu maxJumpY cât timp urcă în aer
+        if isFalling and rootPart and rootPart.Position.Y > maxJumpY then
+            maxJumpY = rootPart.Position.Y
+        end
+
         if not isFalling and not pendingLandingEnd then
             return
         end
@@ -334,6 +341,14 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
         local timeSinceJump = now - fallStartTick
         if timeSinceJump < 0.25 and rootPart.AssemblyLinearVelocity.Y > 10 then
             -- Prea devreme după săritură și încă se ridică cu viteză mare
+            return
+        end
+
+        -- PREVINE INSTA-KILL LA ATERIZARE SAU MERS:
+        -- Trebuie să fi căzut măcar 10 studs de la punctul maxim atins pentru ca hitbox-ul să fie "letal"
+        local fallDistance = maxJumpY - (rootPart and rootPart.Position.Y or maxJumpY)
+        if fallDistance < 10 and not pendingLandingEnd then
+            -- Daca nu a căzut destul și nici nu a lovit în milisecunda imediată după aterizare, nu face nimic
             return
         end
 
