@@ -802,8 +802,8 @@ local function runClientVfx(victimPos, victimColors, groundColor, groundMaterial
     -- 2. Ground Smash (Crater Ring)
     for i = 1, 8 do
         local angle = (math.pi * 2 / 8) * i
-        -- Ajustăm adâncimea de pornire
-        local offset = Vector3.new(math.cos(angle) * 4, -1.5, math.sin(angle) * 4)
+        -- Ajustăm adâncimea de pornire semnificativ mai jos (compenseaza inaltimea HumanoidRootPart fața de tălpi)
+        local offset = Vector3.new(math.cos(angle) * 4, -3.5, math.sin(angle) * 4)
 
         local rock = Instance.new("Part")
         rock.Size = Vector3.new(2, 2, 2)
@@ -815,8 +815,8 @@ local function runClientVfx(victimPos, victimColors, groundColor, groundMaterial
         rock.Parent = Workspace
 
         -- Le ridicăm doar parțial ca să rămână înfipte în pământ (lipite)
-        -- Reducem înălțimea Y de la 3 la 0.8
-        local targetPos = victimPos + offset + Vector3.new(0, 0.8, 0)
+        -- Adaugăm doar 0.5 studzi față de poziția de offset extrem de adâncă
+        local targetPos = victimPos + offset + Vector3.new(0, 0.5, 0)
 
         -- Folosim o rotație aleatorie doar pe axele X și Z pentru a părea ca pământ crăpat/ieșit în afară
         local randX = math.random() * math.pi/4 -- rotație mică max 45 grade

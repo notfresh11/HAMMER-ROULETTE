@@ -22,7 +22,7 @@ local lastHitSoundIndex = 0
 
 -- Helper function to play a 3D random hit sound without repeating the same one twice
 local function playRandomHitSound(parentPart)
-    if #hitSoundIds == 0 then return end
+    if #hitSoundIds == 0 or not parentPart then return end
 
     local randomIndex = math.random(1, #hitSoundIds)
     -- Asigură-te că nu e la fel cu ultimul redat
@@ -31,11 +31,21 @@ local function playRandomHitSound(parentPart)
     end
     lastHitSoundIndex = randomIndex
 
+    -- Creăm un part temporar pentru a găzdui sunetul decuplat de victimă, ca să nu se oprească la moarte
+    local soundAnchor = Instance.new("Part")
+    soundAnchor.Name = "HitSoundAnchor"
+    soundAnchor.Anchored = true
+    soundAnchor.CanCollide = false
+    soundAnchor.Transparency = 1
+    soundAnchor.Size = Vector3.new(0.1, 0.1, 0.1)
+    soundAnchor.Position = parentPart.Position
+    soundAnchor.Parent = Workspace
+
     local hitSound = Instance.new("Sound")
     hitSound.SoundId = hitSoundIds[randomIndex]
     hitSound.RollOffMaxDistance = 150 -- Distanța la care se aude
     hitSound.Volume = 1
-    hitSound.Parent = parentPart
+    hitSound.Parent = soundAnchor
 
     -- Eliminăm primele secunde "mute" din asset pentru a rezolva problema delay-ului
     hitSound.TimePosition = 0.2
@@ -43,7 +53,7 @@ local function playRandomHitSound(parentPart)
     hitSound:Play()
 
     -- Cleanup automatically
-    game:GetService("Debris"):AddItem(hitSound, 5)
+    game:GetService("Debris"):AddItem(soundAnchor, 2)
 end
 
 -- Visual Debug Hitbox Helper
