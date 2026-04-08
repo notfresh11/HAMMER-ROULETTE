@@ -355,6 +355,16 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                         local partsInZone = Workspace:GetPartsInPart(fallZone, overlapParams)
                         if #partsInZone > 0 then
                             isOnGround = true
+                        else
+                            -- Fallback to Raycast: Shoot a ray strictly downwards from the RootPart to see if FallZone is directly beneath the feet
+                            local rayParams = RaycastParams.new()
+                            rayParams.FilterType = Enum.RaycastFilterType.Include
+                            rayParams.FilterDescendantsInstances = {fallZone}
+                            -- We can raycast even against CanCollide=false parts.
+                            local rayHit = Workspace:Raycast(rootPart.Position, Vector3.new(0, -6, 0), rayParams)
+                            if rayHit and rayHit.Instance == fallZone then
+                                isOnGround = true
+                            end
                         end
                     else
                         -- Fallback just in case the map builder forgot to add FallZone, fall back to simple Y velocity check to prevent permanent softlock
