@@ -14,30 +14,56 @@ local MAX_DUMMIES = 10
 local DUMMY_RESPAWN_TIME = 2
 
 local platformPart = nil
-local trainingZoneParams = nil
+local zonePart = nil
 local activeDummies = {}
 
 local playersInTraining = {} -- [Player] = true
 
-local function getPlatform()
-    if platformPart then return platformPart end
+local function getTrainingParts()
+    if platformPart and zonePart then return platformPart, zonePart end
     local wholeMap = Workspace:FindFirstChild("WholeMap")
     if wholeMap then
         local trainingFolder = wholeMap:FindFirstChild("Training")
         if trainingFolder then
             platformPart = trainingFolder:FindFirstChild("Platform")
-            if platformPart then
-                trainingZoneParams = OverlapParams.new()
-                trainingZoneParams.FilterType = Enum.RaycastFilterType.Include
-                -- Filterul va include jucătorii, aşa că nu setăm FilterDescendantsInstances încă (e creat dinamic per verificare)
-            end
+            zonePart = trainingFolder:FindFirstChild("Zone")
         end
     end
-    return platformPart
+    return platformPart, zonePart
+end
+
+local function getValidRandomPosition(pForm)
+    local size = pForm.Size
+    local maxAttempts = 10
+    local MIN_DISTANCE = 8 -- Dummies should be at least 8 studs apart
+
+    for attempt = 1, maxAttempts do
+        local rx = (math.random() - 0.5) * (size.X - 4)
+        local rz = (math.random() - 0.5) * (size.Z - 4)
+        local ry = (size.Y / 2) + 4
+
+        local pivotCFrame = pForm.CFrame * CFrame.new(rx, ry, rz)
+        local pos = pivotCFrame.Position
+
+        local tooClose = false
+        for _, otherDummy in ipairs(activeDummies) do
+            if otherDummy and otherDummy.PrimaryPart then
+                local otherPos = otherDummy:GetPivot().Position
+                if (pos - otherPos).Magnitude < MIN_DISTANCE then
+                    tooClose = true
+                    break
+                end
+            end
+        end
+
+        if not tooClose or attempt == maxAttempts then
+            return pivotCFrame
+        end
+    end
 end
 
 local function spawnDummy()
-    local pForm = getPlatform()
+    local pForm, _ = getTrainingParts()
     if not pForm then return end
 
     local dummyTemplate = ServerStorage:FindFirstChild("Dummy")
@@ -49,14 +75,10 @@ local function spawnDummy()
     local dummy = dummyTemplate:Clone()
     dummy.Parent = Workspace
 
-    -- Găsim poziție random
-    local size = pForm.Size
-    local rx = (math.random() - 0.5) * (size.X - 4) -- Margin safety
-    local rz = (math.random() - 0.5) * (size.Z - 4)
-    local ry = (size.Y / 2) + 3
-
-    local pivotCFrame = pForm.CFrame * CFrame.new(rx, ry, rz)
-    dummy:PivotTo(pivotCFrame)
+    local pivotCFrame = getValidRandomPosition(pForm)
+    if pivotCFrame then
+        dummy:PivotTo(pivotCFrame)
+    end
 
     table.insert(activeDummies, dummy)
 
@@ -103,13 +125,15 @@ function TrainingManager.Start()
     -- Așteptăm ca platforma să existe (dacă e cazul, deși ai menționat că deja există)
     task.spawn(function()
         local attempts = 0
-        while not getPlatform() and attempts < 10 do
+        local pForm, zPart = getTrainingParts()
+        while not (pForm and zPart) and attempts < 10 do
             task.wait(1)
+            pForm, zPart = getTrainingParts()
             attempts += 1
         end
 
-        if not getPlatform() then
-            warn("TrainingManager: Nu s-a putut gasi Workspace.WholeMap.Training.Platform")
+        if not pForm or not zPart then
+            warn("TrainingManager: Nu s-au putut gasi Workspace.WholeMap.Training.Platform sau Zone")
             return
         end
 
@@ -117,8 +141,8 @@ function TrainingManager.Start()
 
         -- Loop de verificare
         RunService.Heartbeat:Connect(function()
-            local pForm = getPlatform()
-            if not pForm then return end
+            local currentPlatform, currentZone = getTrainingParts()
+            if not currentZone then return end
 
             -- Set up params to search only for player characters
             local chars = {}
@@ -130,7 +154,7 @@ function TrainingManager.Start()
             params.FilterType = Enum.RaycastFilterType.Include
             params.FilterDescendantsInstances = chars
 
-            local partsInZone = Workspace:GetPartBoundsInBox(pForm.CFrame, pForm.Size, params)
+            local partsInZone = Workspace:GetPartsInPart(currentZone, params)
             local currentPlayersInZone = {}
 
             for _, part in ipairs(partsInZone) do

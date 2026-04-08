@@ -209,6 +209,15 @@ Players.PlayerRemoving:Connect(function(player)
     cooldowns[player.UserId] = nil
 end)
 
+-- Public API
+function AbilityManager.ResetCooldowns(player)
+    if player and cooldowns[player.UserId] then
+        cooldowns[player.UserId] = {}
+        -- Trimite un event clientului ca sa reseteze si UI-ul
+        abilityStateEvent:FireClient(player, "ResetCooldowns")
+    end
+end
+
 -- Require Abilities table for other modules
 function AbilityManager.GetAbilities()
     return Abilities

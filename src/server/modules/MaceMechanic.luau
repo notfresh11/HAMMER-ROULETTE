@@ -86,6 +86,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
         return
     end
 
+    local currentTool = nil
     -- Create tool safely from ServerStorage
     local hammerFolder = ServerStorage:WaitForChild("Hammer", 5)
     if hammerFolder then
@@ -310,19 +311,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
                             local forceField = hitChar:FindFirstChildOfClass("ForceField")
                             if forceField then forceField:Destroy() end
                         else
-                            -- Prevent the default Roblox "Oof" / death sound from playing
-                            -- Roblox client audio replication sometimes caches the sound before Destroy propagates.
-                            -- Setting Volume = 0 and overriding the ID prevents it entirely.
-                            local isDummy = hitPlayer == nil and hitChar.Name == "Dummy"
-                            local shouldKill = true
-                            local shouldReward = true
-
-                            if isTraining then
-                                shouldReward = false
-                                if not isDummy then
-                                    shouldKill = false
-                                end
-                            end
+                            local shouldKill = not isTraining
+                            local shouldReward = not isTraining
 
                             local victimColors = {}
 

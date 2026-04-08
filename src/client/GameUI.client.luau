@@ -562,6 +562,11 @@ local function setupUI()
         end
 
         table.insert(activeConnections, abilityStateEvent.OnClientEvent:Connect(function(ownedAbilities, equippedAbility, abilitiesDef)
+            if ownedAbilities == "ResetCooldowns" then
+                -- Local cooldown reset logic could be added here if UI tracking is added later
+                -- Currently relying on tick() server-side.
+                return
+            end
             setupAbilities(ownedAbilities, equippedAbility, abilitiesDef)
         end))
 

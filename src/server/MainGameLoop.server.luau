@@ -160,6 +160,9 @@ local function gameLoop()
                 -- Asigură-te că scoatem jucătorul din starea de training dacă era acolo
                 TrainingManager.removePlayerFromTraining(player)
 
+                -- Reset ability cooldowns on match start
+                AbilityManager.ResetCooldowns(player)
+
                 player:SetAttribute("InMatch", true)
                 ProgressionManager.ProcessMatchParticipation(player)
                 if toggleMainUiEvent then
