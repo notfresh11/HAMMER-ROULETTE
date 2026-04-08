@@ -25,6 +25,20 @@ textLabel.Text = ""
 textLabel.Visible = false
 textLabel.Parent = screenGui
 
+local modifiersLabel = Instance.new("TextLabel")
+modifiersLabel.Name = "ModifiersText"
+modifiersLabel.AnchorPoint = Vector2.new(0.5, 0)
+modifiersLabel.Size = UDim2.new(1, 0, 0.05, 0)
+modifiersLabel.Position = UDim2.new(0.5, 0, 0.55, 0) -- Right below CenterText
+modifiersLabel.BackgroundTransparency = 1
+modifiersLabel.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json")
+modifiersLabel.TextScaled = true
+modifiersLabel.TextColor3 = Color3.new(1, 0.8, 0) -- Yellowish for modifiers
+modifiersLabel.TextStrokeTransparency = 0
+modifiersLabel.Text = ""
+modifiersLabel.Visible = false
+modifiersLabel.Parent = screenGui
+
 -- Funcție dedicată pentru a reda sunete izolate care nu se anulează între ele
 local function playSoundIsolated(soundId)
     if not soundId or soundId == "" then return end
@@ -911,5 +925,49 @@ if hideText then
     hideText.OnClientEvent:Connect(function()
         textLabel.Visible = false
         textLabel.Text = ""
+    end)
+end
+
+local updateModifiersUIEvent = ReplicatedStorage:WaitForChild("UpdateModifiersUIEvent", 10)
+if updateModifiersUIEvent then
+    updateModifiersUIEvent.OnClientEvent:Connect(function(activeMods)
+        if #activeMods > 0 then
+            modifiersLabel.Text = table.concat(activeMods, " + ")
+            modifiersLabel.Visible = textLabel.Visible -- Only show if main text is showing
+        else
+            modifiersLabel.Text = ""
+            modifiersLabel.Visible = false
+        end
+    end)
+end
+
+-- Hook into showText and hideText to toggle modifiersLabel visibility together
+if showText then
+    local oldShow = showText.OnClientEvent
+    -- Override or intercept to ensure we show modifiers if they exist
+    showText.OnClientEvent:Connect(function(msg, colorCode, soundId)
+        if modifiersLabel.Text ~= "" then
+            modifiersLabel.Visible = true
+        end
+    end)
+end
+
+if hideText then
+    hideText.OnClientEvent:Connect(function()
+        modifiersLabel.Visible = false
+    end)
+end
+
+local clientModifierEvent = ReplicatedStorage:WaitForChild("ClientModifierEvent", 10)
+if clientModifierEvent then
+    local Lighting = game:GetService("Lighting")
+    clientModifierEvent.OnClientEvent:Connect(function(modType, data)
+        if modType == "Fog" then
+            TweenService:Create(Lighting, TweenInfo.new(1), {
+                FogColor = data.Color,
+                FogEnd = data.End,
+                FogStart = data.Start
+            }):Play()
+        end
     end)
 end

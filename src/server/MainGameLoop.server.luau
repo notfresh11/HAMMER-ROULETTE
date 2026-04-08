@@ -42,6 +42,7 @@ local ProgressionManager = require(script.Parent.modules.ProgressionManager)
 local AntiCheat = require(script.Parent.modules.AntiCheat)
 local AbilityManager = require(script.Parent.modules.AbilityManager)
 local TrainingManager = require(script.Parent.modules.TrainingManager)
+local ModifierManager = require(script.Parent.modules.ModifierManager)
 
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
@@ -154,6 +155,14 @@ local function gameLoop()
             local activePlayers = Matchmaking.getActivePlayers()
             print("MainLoop: Meciul a început cu " .. #activePlayers .. " jucători!")
 
+            ModifierManager.ClearAllModifiers()
+            ModifierManager.PickAndAddModifier(#activePlayers)
+
+            -- Apply baseline states (like Super Speed) to everyone entering the match
+            for _, player in ipairs(activePlayers) do
+                ModifierManager.ReapplyPlayerStates(player)
+            end
+
             -- Rewards for participation & Hide UI
             local toggleMainUiEvent = ReplicatedStorage:FindFirstChild("ToggleMainUIEvent")
             for _, player in ipairs(activePlayers) do
@@ -180,8 +189,19 @@ local function gameLoop()
             end)
 
             -- Bucla de Runde (cât timp sunt cel puțin 2 supraviețuitori în meci)
+            local isFirstRound = true
             while #activePlayers > 1 do
                 print("MainLoop: Începem o NOUĂ RUNDĂ cu " .. #activePlayers .. " supraviețuitori.")
+
+                if not isFirstRound then
+                    ModifierManager.PickAndAddModifier(#activePlayers)
+                end
+                isFirstRound = false
+
+                -- Ensure all players have correct baseline stats updated for the new modifier
+                for _, player in ipairs(activePlayers) do
+                    ModifierManager.ReapplyPlayerStates(player)
+                end
 
                 -- Ensure hammer is visible at round start
                 setHammerVisibility(currentHammer, true)
@@ -193,9 +213,24 @@ local function gameLoop()
 
                 task.wait(1) -- small delay for physics/camera to settle
 
-                local chosenPlayer = Roulette.selectMaceBearer(activePlayers)
-                if chosenPlayer then
-                    Roulette.playRouletteAnimation(chosenPlayer, currentHammer)
+                local numMaces = 1
+                if ModifierManager.IsModifierActive("Triple Trouble !") then
+                    numMaces = 3
+                elseif ModifierManager.IsModifierActive("Double Trouble !") then
+                    numMaces = 2
+                end
+
+                -- Cap the number of maces to activePlayers - 1 to prevent a draw where everyone is a mace user
+                if numMaces >= #activePlayers then
+                    numMaces = math.max(1, #activePlayers - 1)
+                end
+
+                local chosenPlayers = Roulette.selectMaceBearers(activePlayers, numMaces)
+
+                if #chosenPlayers > 0 then
+                    -- Only animate the first one to avoid chaos, or adapt animation.
+                    -- For now, just animate the first one, but assign to all.
+                    Roulette.playRouletteAnimation(chosenPlayers[1], currentHammer)
 
                     -- Unblock movement now that roulette has finished
                     setPlayersAnchored(activePlayers, false)
@@ -204,7 +239,14 @@ local function gameLoop()
                     setHammerVisibility(currentHammer, false)
 
                     local roundEnded = false
-                    local victimDied = false
+                    local activeAttackers = #chosenPlayers
+
+                    local function onAttackerFinished()
+                        activeAttackers = activeAttackers - 1
+                        if activeAttackers <= 0 then
+                            roundEnded = true
+                        end
+                    end
 
                     local function onRoundEnd()
                         roundEnded = true
@@ -233,7 +275,14 @@ local function gameLoop()
                         end
                     end
 
-                    MaceMechanic.startMechanic(chosenPlayer, onRoundEnd)
+                    for _, chosenPlayer in ipairs(chosenPlayers) do
+                        MaceMechanic.startMechanic(chosenPlayer, onAttackerFinished, false, chosenPlayers)
+                    end
+
+                    local heartbeatConn
+                    heartbeatConn = RunService.Heartbeat:Connect(function()
+                        ModifierManager.UpdateDynamicModifiers(activePlayers, chosenPlayers)
+                    end)
 
                     -- Wait until the round is marked as ended (by missing or the attacker dying)
                     -- (If the attacker gets a kill, the mechanic keeps going and doesn't call onRoundEnd)
@@ -244,6 +293,8 @@ local function gameLoop()
                         end
                         task.wait(0.5)
                     end
+
+                    if heartbeatConn then heartbeatConn:Disconnect() end
 
                     -- Reward survivals at round end
                     for _, activeP in ipairs(activePlayers) do
@@ -277,6 +328,8 @@ local function gameLoop()
                 if MaceMechanic.forceStopMechanic then
                     MaceMechanic.forceStopMechanic()
                 end
+
+                ModifierManager.ClearAllModifiers()
 
                 -- Dacă bucla de runde s-a terminat, înseamnă că meciul s-a încheiat (avem <= 1 supraviețuitori)
                 if #activePlayers == 1 then

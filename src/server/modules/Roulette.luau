@@ -15,43 +15,58 @@ Players.PlayerRemoving:Connect(function(player)
     playerWeights[player.UserId] = nil
 end)
 
-function Roulette.selectMaceBearer(activePlayers)
-    if #activePlayers == 0 then return nil end
+function Roulette.selectMaceBearers(activePlayers, count)
+    count = count or 1
+    if #activePlayers == 0 then return {} end
 
-    local totalWeight = 0
-    for _, player in ipairs(activePlayers) do
-        local weight = playerWeights[player.UserId] or 1
-        totalWeight = totalWeight + weight
+    local numToPick = math.min(count, #activePlayers)
+    local chosenPlayers = {}
+    local availablePlayers = {}
+    for _, p in ipairs(activePlayers) do
+        table.insert(availablePlayers, p)
     end
 
-    local randomValue = math.random() * totalWeight
-    local chosenPlayer = nil
-    local currentSum = 0
+    for i = 1, numToPick do
+        local totalWeight = 0
+        for _, player in ipairs(availablePlayers) do
+            local weight = playerWeights[player.UserId] or 1
+            totalWeight = totalWeight + weight
+        end
 
-    for _, player in ipairs(activePlayers) do
-        local weight = playerWeights[player.UserId] or 1
-        currentSum = currentSum + weight
-        if randomValue <= currentSum then
-            chosenPlayer = player
-            break
+        local randomValue = math.random() * totalWeight
+        local chosenPlayer = nil
+        local currentSum = 0
+        local chosenIndex = 1
+
+        for idx, player in ipairs(availablePlayers) do
+            local weight = playerWeights[player.UserId] or 1
+            currentSum = currentSum + weight
+            if randomValue <= currentSum then
+                chosenPlayer = player
+                chosenIndex = idx
+                break
+            end
+        end
+
+        if not chosenPlayer then
+            chosenIndex = math.random(1, #availablePlayers)
+            chosenPlayer = availablePlayers[chosenIndex]
+        end
+
+        table.insert(chosenPlayers, chosenPlayer)
+        table.remove(availablePlayers, chosenIndex)
+
+        -- Update weights
+        for _, player in ipairs(activePlayers) do
+            if player == chosenPlayer then
+                playerWeights[player.UserId] = 1
+            else
+                playerWeights[player.UserId] = (playerWeights[player.UserId] or 1) + 1
+            end
         end
     end
 
-    -- Fallback
-    if not chosenPlayer then
-        chosenPlayer = activePlayers[math.random(1, #activePlayers)]
-    end
-
-    -- Update weights
-    for _, player in ipairs(activePlayers) do
-        if player == chosenPlayer then
-            playerWeights[player.UserId] = 1
-        else
-            playerWeights[player.UserId] = (playerWeights[player.UserId] or 1) + 1
-        end
-    end
-
-    return chosenPlayer
+    return chosenPlayers
 end
 
 function Roulette.playRouletteAnimation(targetPlayer, currentHammerInstance)
