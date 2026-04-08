@@ -7,10 +7,9 @@ local RunService = game:GetService("RunService")
 local ProgressionManager = require(script.Parent.ProgressionManager)
 local AntiCheat = require(script.Parent.AntiCheat)
 
-local currentTool = nil
-local connections = {}
-local roundActive = false
-local currentPlayer = nil
+-- Tracking per-player cleanup functions to allow multiple concurrent maces
+MaceMechanic.playerCleanups = {}
+
 
 -- Hit Sounds Setup
 local hitSoundIds = {
@@ -70,18 +69,20 @@ end
 local maceEventName = "MaceAttackEvent"
 local attackEvent = ReplicatedStorage:WaitForChild(maceEventName)
 
-function MaceMechanic.startMechanic(player, onRoundEndCallback)
-    roundActive = true
+function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
+    local roundActive = true
+    local currentPlayer = player
+    local connections = {}
     local character = player.Character
     if not character then
-        onRoundEndCallback()
+        if onRoundEndCallback then onRoundEndCallback() end
         return
     end
 
     local humanoid = character:FindFirstChild("Humanoid")
     local rootPart = character:FindFirstChild("HumanoidRootPart")
     if not humanoid or not rootPart then
-        onRoundEndCallback()
+        if onRoundEndCallback then onRoundEndCallback() end
         return
     end
 
@@ -151,6 +152,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
 
     local isFalling = false
     local fallStartTick = 0
+    local AUTO_HIT_COOLDOWN = 0.5
+    local lastHitTick = 0
 
     -- Create Permanent Hitbox Part
     local hitboxPart = Instance.new("Part")
@@ -176,9 +179,14 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
 
     currentPlayer = player
     -- Cleanup function
+    local pendingLandingEnd = nil
     local function cleanup()
         roundActive = false
         currentPlayer = nil
+        if pendingLandingEnd then
+            task.cancel(pendingLandingEnd)
+            pendingLandingEnd = nil
+        end
         for _, conn in ipairs(connections) do
             conn:Disconnect()
         end
@@ -202,13 +210,21 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
             humanoid.UseJumpPower = false
             humanoid.JumpHeight = 7.2
         end
+
+        MaceMechanic.playerCleanups[player] = nil
     end
 
+    -- Tracking per-player for abrupt stops
+    MaceMechanic.playerCleanups[player] = cleanup
+
     -- Expose cleanup globally for abrupt match ends
-    MaceMechanic.forceStopMechanic = cleanup
+    MaceMechanic.forceStopMechanic = function()
+        for _, plrcleanup in pairs(MaceMechanic.playerCleanups) do
+            plrcleanup()
+        end
+    end
 
     -- Track jumping/falling
-    local pendingLandingEnd = nil
 
     table.insert(connections, humanoid.StateChanged:Connect(function(oldState, newState)
         if newState == Enum.HumanoidStateType.Freefall then
@@ -297,44 +313,75 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
                             -- Prevent the default Roblox "Oof" / death sound from playing
                             -- Roblox client audio replication sometimes caches the sound before Destroy propagates.
                             -- Setting Volume = 0 and overriding the ID prevents it entirely.
-                            local function disableDeathSound(part)
-                                if part then
-                                    for _, child in ipairs(part:GetChildren()) do
-                                        if child:IsA("Sound") and (child.Name == "Died" or child.Name == "Oof") then
-                                            child.Volume = 0
-                                            child.SoundId = ""
-                                            child:Stop()
-                                            child:Destroy()
+                            local isDummy = hitPlayer == nil and hitChar.Name == "Dummy"
+                            local shouldKill = true
+                            local shouldReward = true
+
+                            if isTraining then
+                                shouldReward = false
+                                if not isDummy then
+                                    shouldKill = false
+                                end
+                            end
+
+                            local victimColors = {}
+
+                            if shouldKill then
+                                -- Prevent the default Roblox "Oof" / death sound from playing
+                                -- Roblox client audio replication sometimes caches the sound before Destroy propagates.
+                                -- Setting Volume = 0 and overriding the ID prevents it entirely.
+                                local function disableDeathSound(part)
+                                    if part then
+                                        for _, child in ipairs(part:GetChildren()) do
+                                            if child:IsA("Sound") and (child.Name == "Died" or child.Name == "Oof") then
+                                                child.Volume = 0
+                                                child.SoundId = ""
+                                                child:Stop()
+                                                child:Destroy()
+                                            end
                                         end
+                                    end
+                                end
+
+                                -- Căutăm sunetul de death și în RootPart și în Head (de obicei apare acolo)
+                                local victimRoot = hitChar:FindFirstChild("HumanoidRootPart")
+                                local victimHead = hitChar:FindFirstChild("Head")
+
+                                disableDeathSound(victimRoot)
+                                disableDeathSound(victimHead)
+
+                                hitHumanoid.Health = 0
+                                if hitPlayer then
+                                    print(player.Name .. " l-a ucis automat pe " .. hitPlayer.Name .. " (Auto-Hit)!")
+                                else
+                                    print(player.Name .. " a distrus un Dummy (Auto-Hit)!")
+                                end
+
+                                -- Ascunde victima și colectează culorile ei
+                                for _, p in ipairs(hitChar:GetDescendants()) do
+                                    if p:IsA("BasePart") then
+                                        table.insert(victimColors, p.Color)
+                                        p.Transparency = 1
+                                        p.CanCollide = false
+                                        -- Oprim și eventualele decals/fețe ca să fie invizibil complet
+                                        for _, d in ipairs(p:GetChildren()) do
+                                            if d:IsA("Decal") then d.Transparency = 1 end
+                                        end
+                                    end
+                                end
+                            else
+                                print(player.Name .. " a lovit pe " .. hitPlayer.Name .. " pe platforma de training!")
+                                -- Nu îl omoară, dar putem colecta culorile pentru VFX
+                                for _, p in ipairs(hitChar:GetDescendants()) do
+                                    if p:IsA("BasePart") then
+                                        table.insert(victimColors, p.Color)
                                     end
                                 end
                             end
 
-                            -- Căutăm sunetul de death și în RootPart și în Head (de obicei apare acolo)
-                            local victimRoot = hitChar:FindFirstChild("HumanoidRootPart")
-                            local victimHead = hitChar:FindFirstChild("Head")
-
-                            disableDeathSound(victimRoot)
-                            disableDeathSound(victimHead)
-
-                            hitHumanoid.Health = 0
-                            print(player.Name .. " l-a ucis automat pe " .. hitPlayer.Name .. " (Auto-Hit)!")
-
                             -- Add Kill Reward
-                            ProgressionManager.ProcessKill(player)
-
-                            -- Ascunde victima și colectează culorile ei
-                            local victimColors = {}
-                            for _, p in ipairs(hitChar:GetDescendants()) do
-                                if p:IsA("BasePart") then
-                                    table.insert(victimColors, p.Color)
-                                    p.Transparency = 1
-                                    p.CanCollide = false
-                                    -- Oprim și eventualele decals/fețe ca să fie invizibil complet
-                                    for _, d in ipairs(p:GetChildren()) do
-                                        if d:IsA("Decal") then d.Transparency = 1 end
-                                    end
-                                end
+                            if shouldReward and hitPlayer then
+                                ProgressionManager.ProcessKill(player)
                             end
 
                             -- Detect ground material and color for dynamic VFX
@@ -421,7 +468,101 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
                             end
                         end)
 
-                        -- Odată ce a omorât un om în acest cadru, e de ajuns
+                        -- Odată ce a lovit în acest cadru, e de ajuns
+                        break
+                    elseif hitChar.Name == "Dummy" and hitHumanoid and hitHumanoid.Health > 0 then
+                        -- Handle Dummy Hit
+                        local victimColors = {}
+                        if isTraining then
+                            hitHumanoid.Health = 0
+                            print(player.Name .. " a distrus un Dummy (Auto-Hit) pe platforma de antrenament!")
+
+                            for _, p in ipairs(hitChar:GetDescendants()) do
+                                if p:IsA("BasePart") then
+                                    table.insert(victimColors, p.Color)
+                                    p.Transparency = 1
+                                    p.CanCollide = false
+                                    for _, d in ipairs(p:GetChildren()) do
+                                        if d:IsA("Decal") then d.Transparency = 1 end
+                                    end
+                                end
+                            end
+                        end
+
+                        local groundColor = Color3.fromRGB(100, 100, 100)
+                        local groundMaterial = Enum.Material.Slate
+                        local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
+
+                        if targetRoot then
+                            local rayOrigin = targetRoot.Position
+                            local rayDirection = Vector3.new(0, -10, 0)
+                            local rayParams = RaycastParams.new()
+                            rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+                            local ignoreList = {hitChar, character, hitboxPart}
+                            rayParams.FilterDescendantsInstances = ignoreList
+
+                            local maxCasts = 5
+                            local casts = 0
+                            local foundGround = false
+
+                            while casts < maxCasts and not foundGround do
+                                casts += 1
+                                local groundHit = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+
+                                if groundHit and groundHit.Instance then
+                                    if groundHit.Instance.Name == "PlayerSpawn" or groundHit.Instance.Name == "HammerSpawn" or groundHit.Instance.Name == "Platform" then
+                                        table.insert(ignoreList, groundHit.Instance)
+                                        rayParams.FilterDescendantsInstances = ignoreList
+                                        rayOrigin = groundHit.Position - Vector3.new(0, 0.01, 0)
+                                    else
+                                        groundColor = groundHit.Instance.Color
+                                        groundMaterial = groundHit.Instance.Material
+                                        foundGround = true
+                                    end
+                                else
+                                    break
+                                end
+                            end
+                        end
+
+                        local vfxEvent = ReplicatedStorage:FindFirstChild("VfxEvent")
+                        if targetRoot and vfxEvent then
+                            vfxEvent:FireAllClients(targetRoot.Position, victimColors, groundColor, groundMaterial)
+                        end
+
+                        hitRegistered = true
+                        lastHitTick = tick()
+
+                        if targetRoot then
+                            playRandomHitSound(targetRoot)
+                        end
+
+                        if currentTool then
+                            local attackAnim = currentTool:FindFirstChild("Attack") or currentTool:FindFirstChild("attack")
+                            if attackAnim and attackAnim:IsA("Animation") then
+                                local animator = humanoid:FindFirstChildWhichIsA("Animator")
+                                if animator then
+                                    local track = animator:LoadAnimation(attackAnim)
+                                    track:Play()
+                                end
+                            end
+                        end
+
+                        rootPart.Anchored = true
+                        task.delay(0.08, function()
+                            if rootPart and rootPart.Parent then
+                                rootPart.Anchored = false
+                            end
+
+                            AntiCheat.SetBypass(player, "Fly", 5)
+                            AntiCheat.SetBypass(player, "Speed", 5)
+
+                            local bounceEvent = ReplicatedStorage:FindFirstChild("MaceBounceEvent")
+                            if bounceEvent then
+                                bounceEvent:FireClient(player)
+                            end
+                        end)
                         break
                     end
                 end
@@ -444,13 +585,13 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback)
     -- Fail safes
     table.insert(connections, humanoid.Died:Connect(function()
         cleanup()
-        onRoundEndCallback()
+        if onRoundEndCallback then onRoundEndCallback() end
     end))
 
     table.insert(connections, Players.PlayerRemoving:Connect(function(plr)
         if plr == player then
             cleanup()
-            onRoundEndCallback()
+            if onRoundEndCallback then onRoundEndCallback() end
         end
     end))
 end

@@ -41,6 +41,7 @@ local DataManager = require(script.Parent.modules.DataManager)
 local ProgressionManager = require(script.Parent.modules.ProgressionManager)
 local AntiCheat = require(script.Parent.modules.AntiCheat)
 local AbilityManager = require(script.Parent.modules.AbilityManager)
+local TrainingManager = require(script.Parent.modules.TrainingManager)
 
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
@@ -156,6 +157,9 @@ local function gameLoop()
             -- Rewards for participation & Hide UI
             local toggleMainUiEvent = ReplicatedStorage:FindFirstChild("ToggleMainUIEvent")
             for _, player in ipairs(activePlayers) do
+                -- Asigură-te că scoatem jucătorul din starea de training dacă era acolo
+                TrainingManager.removePlayerFromTraining(player)
+
                 player:SetAttribute("InMatch", true)
                 ProgressionManager.ProcessMatchParticipation(player)
                 if toggleMainUiEvent then
@@ -329,5 +333,6 @@ end
 
 -- Start
 AntiCheat.Start()
+TrainingManager.Start()
 setupMap()
 gameLoop()
