@@ -335,9 +335,10 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
 
         -- Floor detection to be perfectly certain they touched the ground
         if isFalling and humanoid.Health > 0 and rootPart then
-            -- Ensure a grace period has passed since we started falling/jumping (0.15 seconds)
-            -- On uneven terrain or "Studs" unions, Y velocity bounces violently (can spike heavily upward) exactly as you touch the ground
-            if rootPart.AssemblyLinearVelocity.Y <= 25 and (tick() - fallStartTick > 0.15) then
+            -- Ensure a grace period has passed since we started falling/jumping (0.20 seconds)
+            -- We entirely remove the Y velocity check. If a player is physically intersecting the ground after 0.2 seconds,
+            -- they have landed, regardless of whatever chaotic bounce velocity the Roblox engine is applying to them from the Union.
+            if tick() - fallStartTick > 0.20 then
                 local isOnGround = false
                 local currentState = humanoid:GetState()
 
