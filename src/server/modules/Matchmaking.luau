@@ -118,7 +118,19 @@ function Matchmaking.teleportPlayersToSpawns(activePlayers, currentMapInstance)
 
                         -- Așteaptă foarte puțin ca fizica să se asigure pe noul spawn
                         task.wait(0.1)
+
+                        -- Reset physical velocity to prevent flying off or sliding if they were moving
+                        rootPart.AssemblyLinearVelocity = Vector3.zero
+                        rootPart.AssemblyAngularVelocity = Vector3.zero
+
+                        -- Teleport player
                         rootPart.CFrame = targetCFrame
+
+                        -- Reset movement intent and state to prevent getting stuck in walking/jumping animations
+                        if humanoid then
+                            humanoid.WalkToPoint = targetCFrame.Position
+                            humanoid:ChangeState(Enum.HumanoidStateType.Landed)
+                        end
                     end
                 end
             end)
