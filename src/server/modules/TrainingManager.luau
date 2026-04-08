@@ -10,23 +10,40 @@ local Debris = game:GetService("Debris")
 local MaceMechanic = require(script.Parent.MaceMechanic)
 
 -- Setări
-local MAX_DUMMIES = 10
+local MAX_DUMMIES = 5
 local DUMMY_RESPAWN_TIME = 2
 
 local platformPart = nil
 local zonePart = nil
-local activeDummies = {}
+local elevatedPlatforms = {} -- Va tine minte Platform1-4 pentru a exclude zonele de sub ele
+local dummySpawns = {} -- Lista de part-uri "DummySpawn" de pe platformele elevate
+local activeDummies = {} -- Tine minte { model = dummyModel, spawnPart = dummySpawnPart (nil pentru cei random) }
 
 local playersInTraining = {} -- [Player] = true
 
 local function getTrainingParts()
-    if platformPart and zonePart then return platformPart, zonePart end
+    if platformPart and zonePart and #elevatedPlatforms > 0 then return platformPart, zonePart end
+
     local wholeMap = Workspace:FindFirstChild("WholeMap")
     if wholeMap then
         local trainingFolder = wholeMap:FindFirstChild("Training")
         if trainingFolder then
             platformPart = trainingFolder:FindFirstChild("Platform")
             zonePart = trainingFolder:FindFirstChild("Zone")
+
+            -- Colectăm platformele elevate și spawn-urile de pe ele
+            elevatedPlatforms = {}
+            dummySpawns = {}
+            for i = 1, 4 do
+                local plat = trainingFolder:FindFirstChild("Platform" .. i)
+                if plat then
+                    table.insert(elevatedPlatforms, plat)
+                    local spawnPart = plat:FindFirstChild("DummySpawn")
+                    if spawnPart then
+                        table.insert(dummySpawns, spawnPart)
+                    end
+                end
+            end
         end
     end
     return platformPart, zonePart
@@ -58,27 +75,46 @@ local function getValidRandomPosition(pForm)
         local raycastResult = Workspace:Raycast(rayOrigin, Vector3.new(0, -100, 0), raycastParams)
 
         if raycastResult then
-            -- Pozitia pe Y exact pe platforma + jumatate din inaltimea tipica a unui Dummy (aprox 3 studs ptr HumanoidRootPart)
-            local finalPos = raycastResult.Position + Vector3.new(0, 3, 0)
+            -- Verificam sa nu fim cumva fix sub o platforma suspendata
+            local underPlatform = false
 
-            -- Calculam un CFrame care doar se uita in fata, pentru a evita spawnarea in diagonala din cauza rotatiei platformei
-            -- Pastram rotatia Y a platformei doar vizual daca dorim, dar orientarea simpla este mai sigura.
-            local _, yAngle, _ = pForm.CFrame:ToEulerAnglesYXZ()
-            local pivotCFrame = CFrame.new(finalPos) * CFrame.Angles(0, yAngle, 0)
+            -- Facem un Raycast in SUS de la punctul unde a cazut raza pe platforma de jos
+            local upRayOrigin = raycastResult.Position + Vector3.new(0, 0.1, 0)
+            local upRayDirection = Vector3.new(0, 100, 0)
 
-            local tooClose = false
-            for _, otherDummy in ipairs(activeDummies) do
-                if otherDummy and otherDummy.PrimaryPart then
-                    local otherPos = otherDummy:GetPivot().Position
-                    if (finalPos - otherPos).Magnitude < MIN_DISTANCE then
-                        tooClose = true
-                        break
-                    end
-                end
+            local upParams = RaycastParams.new()
+            upParams.FilterType = Enum.RaycastFilterType.Include
+            upParams.FilterDescendantsInstances = elevatedPlatforms
+
+            local upHit = Workspace:Raycast(upRayOrigin, upRayDirection, upParams)
+            if upHit then
+                underPlatform = true
             end
 
-            if not tooClose then
-                return pivotCFrame
+            if not underPlatform then
+                -- Pozitia pe Y exact pe platforma + jumatate din inaltimea tipica a unui Dummy (aprox 3 studs ptr HumanoidRootPart)
+                local finalPos = raycastResult.Position + Vector3.new(0, 3, 0)
+
+                -- Calculam un CFrame care doar se uita in fata, pentru a evita spawnarea in diagonala din cauza rotatiei platformei
+                -- Pastram rotatia Y a platformei doar vizual daca dorim, dar orientarea simpla este mai sigura.
+                local _, yAngle, _ = pForm.CFrame:ToEulerAnglesYXZ()
+                local pivotCFrame = CFrame.new(finalPos) * CFrame.Angles(0, yAngle, 0)
+
+                local tooClose = false
+                for _, dummyData in ipairs(activeDummies) do
+                    local otherDummy = dummyData.model
+                    if otherDummy and otherDummy.PrimaryPart then
+                        local otherPos = otherDummy:GetPivot().Position
+                        if (finalPos - otherPos).Magnitude < MIN_DISTANCE then
+                            tooClose = true
+                            break
+                        end
+                    end
+                end
+
+                if not tooClose then
+                    return pivotCFrame
+                end
             end
         end
     end
@@ -86,14 +122,28 @@ local function getValidRandomPosition(pForm)
     return nil
 end
 
-local function spawnDummy()
+local function getFixedSpawnPosition(spawnPart)
+    local finalPos = spawnPart.Position + Vector3.new(0, (spawnPart.Size.Y/2) + 3, 0)
+    local _, yAngle, _ = spawnPart.CFrame:ToEulerAnglesYXZ()
+    return CFrame.new(finalPos) * CFrame.Angles(0, yAngle, 0)
+end
+
+local function spawnDummy(assignedSpawnPart)
     local pForm, _ = getTrainingParts()
     if not pForm then return end
 
-    local pivotCFrame = getValidRandomPosition(pForm)
+    local pivotCFrame = nil
+    if assignedSpawnPart then
+        pivotCFrame = getFixedSpawnPosition(assignedSpawnPart)
+    else
+        pivotCFrame = getValidRandomPosition(pForm)
+    end
+
     if not pivotCFrame then
         -- Daca nu gasim loc, mai incercam putin mai incolo
-        task.delay(1, spawnDummy)
+        task.delay(1, function()
+            spawnDummy(assignedSpawnPart)
+        end)
         return
     end
 
@@ -107,7 +157,8 @@ local function spawnDummy()
     dummy.Parent = Workspace
     dummy:PivotTo(pivotCFrame)
 
-    table.insert(activeDummies, dummy)
+    local dummyData = { model = dummy, spawnPart = assignedSpawnPart }
+    table.insert(activeDummies, dummyData)
 
     local humanoid = dummy:FindFirstChild("Humanoid")
     if humanoid then
@@ -117,7 +168,7 @@ local function spawnDummy()
                 if connection then connection:Disconnect() end
 
                 -- Elimina imediat din tabel in mod sigur
-                local idx = table.find(activeDummies, dummy)
+                local idx = table.find(activeDummies, dummyData)
                 if idx then
                     table.remove(activeDummies, idx)
                 end
@@ -133,18 +184,30 @@ local function spawnDummy()
                     end
                 end
 
-                -- Distruge dummy-ul complet si sigur din memorie scurt timp mai tarziu (sau chiar acum)
+                -- Distruge dummy-ul complet si sigur din memorie scurt timp mai tarziu
                 task.delay(0.1, function()
                     if dummy then
                         dummy:Destroy()
                     end
                 end)
 
-                -- Forteaza respawn-ul dupa DUMMY_RESPAWN_TIME
+                -- Forteaza respawn-ul dupa DUMMY_RESPAWN_TIME in aceeasi locatie (sau random daca nu avea)
                 task.delay(DUMMY_RESPAWN_TIME, function()
-                    -- Daca meciul nu s-a oprit si mai e loc, spawnam altul.
-                    if #activeDummies < MAX_DUMMIES then
-                        spawnDummy()
+                    if assignedSpawnPart then
+                        -- E fixat, re-spawnam exact la fel
+                        spawnDummy(assignedSpawnPart)
+                    else
+                        -- Numarul de dummies random curenți
+                        local randomCount = 0
+                        for _, dData in ipairs(activeDummies) do
+                            if dData.spawnPart == nil then
+                                randomCount = randomCount + 1
+                            end
+                        end
+
+                        if randomCount < MAX_DUMMIES then
+                            spawnDummy(nil)
+                        end
                     end
                 end)
             end
@@ -153,9 +216,31 @@ local function spawnDummy()
 end
 
 local function setupDummies()
-    local currentCount = #activeDummies
-    for i = currentCount + 1, MAX_DUMMIES do
-        spawnDummy()
+    -- 1. Spawnam pe platformele fixe
+    for _, spawnPart in ipairs(dummySpawns) do
+        -- Verificam daca e deja activ
+        local alreadyExists = false
+        for _, dummyData in ipairs(activeDummies) do
+            if dummyData.spawnPart == spawnPart then
+                alreadyExists = true
+                break
+            end
+        end
+        if not alreadyExists then
+            spawnDummy(spawnPart)
+        end
+    end
+
+    -- 2. Spawnam restul de dummy-uri random pana la limita maxima
+    local randomCount = 0
+    for _, dummyData in ipairs(activeDummies) do
+        if dummyData.spawnPart == nil then
+            randomCount = randomCount + 1
+        end
+    end
+
+    for i = randomCount + 1, MAX_DUMMIES do
+        spawnDummy(nil)
     end
 end
 
