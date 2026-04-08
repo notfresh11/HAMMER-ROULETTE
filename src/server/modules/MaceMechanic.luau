@@ -116,7 +116,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
 
     humanoid.UseJumpPower = false
     if applyJumpBoost then
-        humanoid.JumpHeight = 60
+        humanoid.JumpHeight = 40
     else
         humanoid.JumpHeight = 7.2
     end
@@ -253,10 +253,10 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
             if not isTraining then
                 humanoid.JumpHeight = 0
             else
-                -- În momentul în care sare, înregistrăm cooldown-ul DOAR dacă a avut jump boost (JumpHeight == 60)
+                -- În momentul în care sare, înregistrăm cooldown-ul DOAR dacă a avut jump boost (JumpHeight == 40)
                 -- și nu era deja pe cooldown
                 local userId = player.UserId
-                if humanoid.JumpHeight > 50 then
+                if humanoid.JumpHeight > 30 then
                     MaceMechanic.jumpCooldowns[userId] = tick()
                     -- Jump-ul următor (până trec 10s) va fi mic
                     humanoid.JumpHeight = 7.2
@@ -280,8 +280,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
             local lastJump = MaceMechanic.jumpCooldowns[userId] or 0
             if tick() - lastJump >= 10 then
                 -- Doar dacă nu e deja în aer redăm jump-ul mare
-                if humanoid:GetState() ~= Enum.HumanoidStateType.Freefall and humanoid.JumpHeight < 50 then
-                    humanoid.JumpHeight = 60
+                if humanoid:GetState() ~= Enum.HumanoidStateType.Freefall and humanoid.JumpHeight < 30 then
+                    humanoid.JumpHeight = 40
                 end
             end
         end
@@ -651,7 +651,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
             isFalling = true
             -- Îi redăm posibilitatea de jump pentru viitoarea cădere, deși bounce-ul deja îl forțează în sus
             if humanoid.JumpHeight == 0 then
-                humanoid.JumpHeight = 60
+                humanoid.JumpHeight = 40
             end
         end
     end))

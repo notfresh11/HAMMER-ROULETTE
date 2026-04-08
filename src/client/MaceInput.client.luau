@@ -40,8 +40,8 @@ if bounceEvent then
                 humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
 
                 -- Fixăm Y-ul la o valoare fixă, păstrând inerția orizontală, ca săritura să fie mereu la fel de înaltă
-                rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, 90, rootPart.AssemblyLinearVelocity.Z)
-                print("MaceInput: S-a separat de sol si Viteza Y a fost setată exact la 90!")
+                rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, 125, rootPart.AssemblyLinearVelocity.Z)
+                print("MaceInput: S-a separat de sol si Viteza Y a fost setată exact la 125!")
             end
         end
     end)
