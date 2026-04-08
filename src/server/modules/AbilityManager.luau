@@ -180,8 +180,8 @@ end
 
 -- Handling Ability Use
 abilityUseEvent.OnServerEvent:Connect(function(player)
-    -- Abilitatile functioneaza doar in meci
-    if not player:GetAttribute("InMatch") then return end
+    -- Abilitatile functioneaza doar in meci sau pe platforma de training
+    if not player:GetAttribute("InMatch") and not player:GetAttribute("InTraining") then return end
 
     local data = DataManager.GetData(player)
     if not data or not data.EquippedAbility then return end
