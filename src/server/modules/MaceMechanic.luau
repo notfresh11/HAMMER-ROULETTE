@@ -102,9 +102,24 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
         warn("MaceMechanic: Nu am putut găsi folderul 'Hammer' în ServerStorage!")
     end
 
-    -- Boost Jump
+    if not MaceMechanic.jumpCooldowns then MaceMechanic.jumpCooldowns = {} end
+
+    -- Cooldown jump în training: 10 secunde
+    local applyJumpBoost = true
+    if isTraining then
+        local userId = player.UserId
+        local lastJump = MaceMechanic.jumpCooldowns[userId] or 0
+        if tick() - lastJump < 10 then
+            applyJumpBoost = false
+        end
+    end
+
     humanoid.UseJumpPower = false
-    humanoid.JumpHeight = 60
+    if applyJumpBoost then
+        humanoid.JumpHeight = 60
+    else
+        humanoid.JumpHeight = 7.2
+    end
 
     -- Play Equip Animation if it exists inside the Tool
     local equipAnim = currentTool:FindFirstChild("Equip") or currentTool:FindFirstChild("equip")
@@ -233,7 +248,18 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
             fallStartTick = tick()
             trail.Enabled = true
             -- Imediat ce e în aer, îi tăiem JumpHeight ca să nu poată ține Space apăsat la nesfârșit (Bunny Hop)
-            humanoid.JumpHeight = 0
+            if not isTraining then
+                humanoid.JumpHeight = 0
+            else
+                -- În momentul în care sare, înregistrăm cooldown-ul DOAR dacă a avut jump boost (JumpHeight == 60)
+                -- și nu era deja pe cooldown
+                local userId = player.UserId
+                if humanoid.JumpHeight > 50 then
+                    MaceMechanic.jumpCooldowns[userId] = tick()
+                    -- Jump-ul următor (până trec 10s) va fi mic
+                    humanoid.JumpHeight = 7.2
+                end
+            end
         end
     end))
 
@@ -245,6 +271,18 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
         if not roundActive or not player then return end
 
         local now = tick()
+
+        -- Training jump cooldown recharger
+        if isTraining and humanoid and humanoid.Health > 0 then
+            local userId = player.UserId
+            local lastJump = MaceMechanic.jumpCooldowns[userId] or 0
+            if tick() - lastJump >= 10 then
+                -- Doar dacă nu e deja în aer redăm jump-ul mare
+                if humanoid:GetState() ~= Enum.HumanoidStateType.Freefall and humanoid.JumpHeight < 50 then
+                    humanoid.JumpHeight = 60
+                end
+            end
+        end
 
         -- Floor detection via raycast to be perfectly certain they touched the ground
         if isFalling and humanoid.Health > 0 and rootPart then
@@ -267,13 +305,20 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
                     -- They touched the ground. Give a tiny margin to register any last-millisecond hit.
                     trail.Enabled = false
                     isFalling = false
-                    pendingLandingEnd = task.delay(0.2, function()
-                        if roundActive then
-                            print(player.Name .. " a aterizat. Rateu! Runda se încheie.")
-                            cleanup()
-                            onRoundEndCallback()
+                    if isTraining then
+                        -- În training, doar resetăm starea de cădere (și JumpHeight la fel cu starea normală)
+                        if humanoid then
+                            humanoid.JumpHeight = 7.2
                         end
-                    end)
+                    else
+                        pendingLandingEnd = task.delay(0.2, function()
+                            if roundActive then
+                                print(player.Name .. " a aterizat. Rateu! Runda se încheie.")
+                                cleanup()
+                                onRoundEndCallback()
+                            end
+                        end)
+                    end
                 end
             end
         end
@@ -568,7 +613,9 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
 
             isFalling = true
             -- Îi redăm posibilitatea de jump pentru viitoarea cădere, deși bounce-ul deja îl forțează în sus
-            humanoid.JumpHeight = 60
+            if humanoid.JumpHeight == 0 then
+                humanoid.JumpHeight = 60
+            end
         end
     end))
 

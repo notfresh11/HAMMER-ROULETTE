@@ -35,36 +35,58 @@ end
 local function getValidRandomPosition(pForm)
     local size = pForm.Size
     local maxAttempts = 10
-    local MIN_DISTANCE = 8 -- Dummies should be at least 8 studs apart
+    local MIN_DISTANCE = 5 -- Dummies should be at least 5 studs apart
 
     for attempt = 1, maxAttempts do
         local rx = (math.random() - 0.5) * (size.X - 4)
         local rz = (math.random() - 0.5) * (size.Z - 4)
-        local ry = (size.Y / 2) + 4
 
-        local pivotCFrame = pForm.CFrame * CFrame.new(rx, ry, rz)
-        local pos = pivotCFrame.Position
+        -- Raycast de sus in jos pentru a gasi inaltimea corecta a platformei
+        -- Folosim Y de sus + 50 pentru a fi siguri ca tragem de deasupra
+        local rayOriginCFrame = pForm.CFrame * CFrame.new(rx, (size.Y / 2) + 50, rz)
+        local rayOrigin = rayOriginCFrame.Position
 
-        local tooClose = false
-        for _, otherDummy in ipairs(activeDummies) do
-            if otherDummy and otherDummy.PrimaryPart then
-                local otherPos = otherDummy:GetPivot().Position
-                if (pos - otherPos).Magnitude < MIN_DISTANCE then
-                    tooClose = true
-                    break
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterDescendantsInstances = {pForm}
+        raycastParams.FilterType = Enum.RaycastFilterType.Include
+
+        local raycastResult = Workspace:Raycast(rayOrigin, Vector3.new(0, -100, 0), raycastParams)
+
+        if raycastResult then
+            -- Pozitia pe Y exact pe platforma + jumate din inaltimea tipica a unui Dummy (aprox 3 studs ptr HumanoidRootPart)
+            local finalPos = raycastResult.Position + Vector3.new(0, 3, 0)
+            -- Mentinem orientarea pe Y a platformei ca sa nu stea intr-o parte
+            local pivotCFrame = CFrame.new(finalPos) * CFrame.Angles(0, pForm.CFrame.Rotation.Y, 0)
+
+            local tooClose = false
+            for _, otherDummy in ipairs(activeDummies) do
+                if otherDummy and otherDummy.PrimaryPart then
+                    local otherPos = otherDummy:GetPivot().Position
+                    if (finalPos - otherPos).Magnitude < MIN_DISTANCE then
+                        tooClose = true
+                        break
+                    end
                 end
             end
-        end
 
-        if not tooClose or attempt == maxAttempts then
-            return pivotCFrame
+            if not tooClose then
+                return pivotCFrame
+            end
         end
     end
+    return nil
 end
 
 local function spawnDummy()
     local pForm, _ = getTrainingParts()
     if not pForm then return end
+
+    local pivotCFrame = getValidRandomPosition(pForm)
+    if not pivotCFrame then
+        -- Daca nu gasim loc, mai incercam putin mai incolo
+        task.delay(1, spawnDummy)
+        return
+    end
 
     local dummyTemplate = ServerStorage:FindFirstChild("Dummy")
     if not dummyTemplate then
@@ -74,11 +96,7 @@ local function spawnDummy()
 
     local dummy = dummyTemplate:Clone()
     dummy.Parent = Workspace
-
-    local pivotCFrame = getValidRandomPosition(pForm)
-    if pivotCFrame then
-        dummy:PivotTo(pivotCFrame)
-    end
+    dummy:PivotTo(pivotCFrame)
 
     table.insert(activeDummies, dummy)
 
@@ -91,6 +109,7 @@ local function spawnDummy()
             Debris:AddItem(dummy, 1) -- Curățare după mort
 
             task.delay(DUMMY_RESPAWN_TIME, function()
+                -- Verificam cate dummy uri mai sunt active sau sunt in curs de respawn
                 if #activeDummies < MAX_DUMMIES then
                     spawnDummy()
                 end
