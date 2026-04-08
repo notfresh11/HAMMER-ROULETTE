@@ -336,8 +336,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
         -- Floor detection to be perfectly certain they touched the ground
         if isFalling and humanoid.Health > 0 and rootPart then
             -- Ensure a grace period has passed since we started falling/jumping (0.15 seconds)
-            -- On uneven terrain or "Studs" unions, Y velocity bounces violently (can spike up to 5 studs/s upward) exactly as you touch the ground
-            if rootPart.AssemblyLinearVelocity.Y <= 10 and (tick() - fallStartTick > 0.15) then
+            -- On uneven terrain or "Studs" unions, Y velocity bounces violently (can spike heavily upward) exactly as you touch the ground
+            if rootPart.AssemblyLinearVelocity.Y <= 25 and (tick() - fallStartTick > 0.15) then
                 local isOnGround = false
                 local currentState = humanoid:GetState()
 
@@ -349,20 +349,29 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                 end
 
                 if not isOnGround then
-                    -- Robust fallback: Use a Blockcast instead of a thin Raycast to prevent slipping through Union cracks
-                    local rayParams = RaycastParams.new()
-                    rayParams.FilterType = Enum.RaycastFilterType.Exclude
-                    rayParams.FilterDescendantsInstances = {character, hitboxPart}
+                    -- Ultimate fallback: Use GetPartBoundsInBox for thick spatial detection.
+                    -- Raycasts and Blockcasts FAIL completely if their origin point clips inside a complex Union floor.
+                    -- A spatial query detects intersection no matter what, preventing clipping fall-throughs.
 
-                    local boxSize = Vector3.new(2, 0.1, 2) -- Covers the width of the character's feet
-                    -- Garantăm că blocul este aliniat plat pe axele globale pentru a nu se lovi pe sine din greșeală dacă RootPart este înclinat
-                    local boxCFrame = CFrame.new(rootPart.Position)
-                    -- 4.5 stud depth is large enough to cover HipHeight + minor terrain variations
-                    local rayDirection = Vector3.new(0, -4.5, 0)
-                    local raycastResult = Workspace:Blockcast(boxCFrame, boxSize, rayDirection, rayParams)
+                    local overlapParams = OverlapParams.new()
+                    overlapParams.FilterType = Enum.RaycastFilterType.Exclude
+                    overlapParams.FilterDescendantsInstances = {character, hitboxPart}
 
-                    if raycastResult then
-                        isOnGround = true
+                    local hipHeight = humanoid.HipHeight or 2
+                    -- Centram cutia de detectie fix sub picioare, cu o grosime verticală considerabilă (1.5) pt a prinde orice clip în podea
+                    local boxCFrame = CFrame.new(rootPart.Position - Vector3.new(0, (rootPart.Size.Y / 2) + hipHeight, 0))
+                    local boxSize = Vector3.new(2.5, 1.5, 2.5)
+
+                    local partsInFloorBox = Workspace:GetPartBoundsInBox(boxCFrame, boxSize, overlapParams)
+
+                    -- Orice obiect lovit care poate avea coliziuni fizice ne indică o podea validă
+                    if #partsInFloorBox > 0 then
+                        for _, floorPart in ipairs(partsInFloorBox) do
+                            if floorPart.CanCollide then
+                                isOnGround = true
+                                break
+                            end
+                        end
                     end
                 end
 
