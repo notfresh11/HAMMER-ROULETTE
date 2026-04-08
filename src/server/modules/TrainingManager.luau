@@ -111,14 +111,26 @@ local function spawnDummy()
 
     local humanoid = dummy:FindFirstChild("Humanoid")
     if humanoid then
-        humanoid.Died:Connect(function()
+        local connection
+        connection = humanoid.Died:Connect(function()
+            if connection then connection:Disconnect() end
+
+            -- Elimina imediat din tabel in mod sigur
             local idx = table.find(activeDummies, dummy)
-            if idx then table.remove(activeDummies, idx) end
+            if idx then
+                table.remove(activeDummies, idx)
+            end
 
-            Debris:AddItem(dummy, 1) -- Curățare după mort
+            -- Distruge dummy-ul complet si sigur din memorie
+            task.delay(0.5, function()
+                if dummy then
+                    dummy:Destroy()
+                end
+            end)
 
+            -- Forteaza respawn-ul dupa DUMMY_RESPAWN_TIME
             task.delay(DUMMY_RESPAWN_TIME, function()
-                -- Verificam cate dummy uri mai sunt active sau sunt in curs de respawn
+                -- Daca meciul nu s-a oprit si mai e loc, spawnam altul.
                 if #activeDummies < MAX_DUMMIES then
                     spawnDummy()
                 end

@@ -509,19 +509,17 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
                         -- Handle Dummy Hit
                         local victimColors = {}
                         if isTraining then
-                            hitHumanoid.Health = 0
                             print(player.Name .. " a distrus un Dummy (Auto-Hit) pe platforma de antrenament!")
 
+                            -- Just collect colors for VFX, let Roblox handle the actual body fall
                             for _, p in ipairs(hitChar:GetDescendants()) do
                                 if p:IsA("BasePart") then
                                     table.insert(victimColors, p.Color)
-                                    p.Transparency = 1
-                                    p.CanCollide = false
-                                    for _, d in ipairs(p:GetChildren()) do
-                                        if d:IsA("Decal") then d.Transparency = 1 end
-                                    end
                                 end
                             end
+
+                            -- Set health to 0 to trigger the Died event in TrainingManager
+                            hitHumanoid.Health = 0
                         end
 
                         local groundColor = Color3.fromRGB(100, 100, 100)
