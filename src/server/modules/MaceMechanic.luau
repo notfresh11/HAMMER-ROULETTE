@@ -333,7 +333,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
         -- Floor detection to be perfectly certain they touched the ground
         if isFalling and humanoid.Health > 0 and rootPart then
             -- Ensure a grace period has passed since we started falling/jumping (0.15 seconds)
-            if rootPart.AssemblyLinearVelocity.Y <= 0.5 and (tick() - fallStartTick > 0.15) then
+            -- On uneven terrain or "Studs" unions, Y velocity can fluctuate slightly around 0 when sliding/landing.
+            if rootPart.AssemblyLinearVelocity.Y <= 1 and (tick() - fallStartTick > 0.15) then
                 -- Folosim atat senzorul Roblox cat si un Raycast extins pentru a prinde orice material/denivelare
                 local isOnGround = humanoid.FloorMaterial ~= Enum.Material.Air
 
@@ -343,8 +344,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                     rayParams.FilterDescendantsInstances = {character, hitboxPart}
 
                     local rayOrigin = rootPart.Position
-                    -- Marim raza de la 3.1 la 3.5 pentru a acoperi diferentele de teren Studs/Block
-                    local rayDirection = Vector3.new(0, -3.5, 0)
+                    -- Marim raza de la 3.5 la 4.5 pentru a acoperi diferentele masive de teren pe BasePart/Unions și slope-uri
+                    local rayDirection = Vector3.new(0, -4.5, 0)
                     local raycastResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
 
                     if raycastResult then
