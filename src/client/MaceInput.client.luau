@@ -29,15 +29,19 @@ if bounceEvent then
                     end
                 end
 
-                -- Oprim inerția curentă de mișcare complet (pentru a evita ca forțele existente să se adauge la bounce și să creeze inconsecvențe)
+                -- Ridicăm player-ul puțin în aer (1 stud) pentru a asigura separarea de hitbox-ul podelei sau al manechinului
+                -- Dacă coliziunea pe picioare e activă în milisecunda forței, motorul fizic anulează AssemblyLinearVelocity pe Y, forțând starea Landed.
+                rootPart.CFrame = rootPart.CFrame + Vector3.new(0, 1, 0)
+
+                -- Oprim inerția curentă de mișcare complet pe verticală (pentru a evita ca forțele existente să se adauge la bounce)
                 rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, 0, rootPart.AssemblyLinearVelocity.Z)
 
                 -- Setăm o viteză constantă mare și resetăm starea humanoid-ului ca să nu o blocheze
-                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
 
                 -- Fixăm Y-ul la o valoare fixă, păstrând inerția orizontală, ca săritura să fie mereu la fel de înaltă
                 rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, 90, rootPart.AssemblyLinearVelocity.Z)
-                print("MaceInput: Viteza Y a fost setată exact la 90, curățând inerția veche!")
+                print("MaceInput: S-a separat de sol si Viteza Y a fost setată exact la 90!")
             end
         end
     end)

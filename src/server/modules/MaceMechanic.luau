@@ -286,36 +286,46 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
             end
         end
 
-        -- Floor detection via raycast to be perfectly certain they touched the ground
+        -- Floor detection to be perfectly certain they touched the ground
         if isFalling and humanoid.Health > 0 and rootPart then
-            -- Only check for landing if we are actually falling downwards (or at the peak of jump)
-            -- And ensure a grace period has passed since we started falling/jumping (0.15 seconds)
-            if rootPart.AssemblyLinearVelocity.Y <= 0 and (tick() - fallStartTick > 0.15) then
-                -- Set up raycast params to ignore the character itself
-                local rayParams = RaycastParams.new()
-                rayParams.FilterType = Enum.RaycastFilterType.Exclude
-                rayParams.FilterDescendantsInstances = {character, hitboxPart}
+            -- Ensure a grace period has passed since we started falling/jumping (0.15 seconds)
+            if rootPart.AssemblyLinearVelocity.Y <= 0.5 and (tick() - fallStartTick > 0.15) then
+                -- Folosim atat senzorul Roblox cat si un Raycast extins pentru a prinde orice material/denivelare
+                local isOnGround = humanoid.FloorMaterial ~= Enum.Material.Air
 
-                -- Raycast from slightly above the bottom of the root part, pointing down past the legs
-                -- Distance adjusted to exactly 3.1 to avoid false triggers
-                local rayOrigin = rootPart.Position
-                local rayDirection = Vector3.new(0, -3.1, 0)
+                if not isOnGround then
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                    rayParams.FilterDescendantsInstances = {character, hitboxPart}
 
-                local raycastResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+                    local rayOrigin = rootPart.Position
+                    -- Marim raza de la 3.1 la 3.5 pentru a acoperi diferentele de teren Studs/Block
+                    local rayDirection = Vector3.new(0, -3.5, 0)
+                    local raycastResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
 
-                if raycastResult and not pendingLandingEnd then
-                    -- They touched the ground. Give a tiny margin to register any last-millisecond hit.
+                    if raycastResult then
+                        isOnGround = true
+                    end
+                end
+
+                if isOnGround and not pendingLandingEnd then
+                    -- They touched the ground.
                     trail.Enabled = false
                     isFalling = false
+
+                    -- Resetam inaltimea pentru a nu pastra fallDistance ridicat cand ramane pe sol
+                    maxJumpY = rootPart.Position.Y
+
                     if isTraining then
                         -- În training, doar resetăm starea de cădere (și JumpHeight la fel cu starea normală)
                         if humanoid then
                             humanoid.JumpHeight = 7.2
                         end
                     else
-                        pendingLandingEnd = task.delay(0.2, function()
+                        -- Margin de milisecunde pentru a prinde lovituri la milimetru de sol
+                        pendingLandingEnd = task.delay(0.1, function()
                             if roundActive then
-                                print(player.Name .. " a aterizat. Rateu! Runda se încheie.")
+                                print(player.Name .. " a aterizat pe podea.")
                                 cleanup()
                                 onRoundEndCallback()
                             end
