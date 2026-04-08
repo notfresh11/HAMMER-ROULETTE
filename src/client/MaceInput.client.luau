@@ -17,10 +17,15 @@ if bounceEvent then
             local rootPart = character:FindFirstChild("HumanoidRootPart")
             local humanoid = character:FindFirstChild("Humanoid")
             if rootPart and humanoid then
-                -- Setăm o viteză mare și resetăm starea humanoid-ului ca să nu o blocheze
+                -- Oprim inerția curentă de mișcare complet (pentru a evita ca forțele existente să se adauge la bounce și să creeze inconsecvențe)
+                rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, 0, rootPart.AssemblyLinearVelocity.Z)
+
+                -- Setăm o viteză constantă mare și resetăm starea humanoid-ului ca să nu o blocheze
                 humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                rootPart.AssemblyLinearVelocity = Vector3.new(0, 100, 0)
-                print("MaceInput: Viteza Y a fost setată la 100!")
+
+                -- Fixăm Y-ul la o valoare fixă, păstrând inerția orizontală, ca săritura să fie mereu la fel de înaltă
+                rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, 90, rootPart.AssemblyLinearVelocity.Z)
+                print("MaceInput: Viteza Y a fost setată exact la 90, curățând inerția veche!")
             end
         end
     end)

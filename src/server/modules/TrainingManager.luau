@@ -35,7 +35,7 @@ end
 local function getValidRandomPosition(pForm)
     local size = pForm.Size
     local maxAttempts = 15
-    local MIN_DISTANCE = 5 -- Dummies should be at least 5 studs apart
+    local MIN_DISTANCE = 12 -- Dummies should be well spaced
 
     for attempt = 1, maxAttempts do
         -- Alegem un punct aleatoriu in spatiul LOCAL al platformei (ignoram rotatiile momentan)
