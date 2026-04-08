@@ -34,29 +34,37 @@ end
 
 local function getValidRandomPosition(pForm)
     local size = pForm.Size
-    local maxAttempts = 10
+    local maxAttempts = 15
     local MIN_DISTANCE = 5 -- Dummies should be at least 5 studs apart
 
     for attempt = 1, maxAttempts do
-        local rx = (math.random() - 0.5) * (size.X - 4)
-        local rz = (math.random() - 0.5) * (size.Z - 4)
+        -- Alegem un punct aleatoriu in spatiul LOCAL al platformei (ignoram rotatiile momentan)
+        -- Daca platforma e pusa pe jos, X si Z sunt de obicei lungimea/latimea, iar Y este inaltimea (grosimea).
+        -- Vom selecta un punct fix in centrul "grosimii" platformei ca sa fim siguri ca e in ea.
+        local localX = (math.random() - 0.5) * (size.X - 4)
+        local localZ = (math.random() - 0.5) * (size.Z - 4)
 
-        -- Raycast de sus in jos pentru a gasi inaltimea corecta a platformei
-        -- Folosim Y de sus + 50 pentru a fi siguri ca tragem de deasupra
-        local rayOriginCFrame = pForm.CFrame * CFrame.new(rx, (size.Y / 2) + 50, rz)
-        local rayOrigin = rayOriginCFrame.Position
+        -- Calculam pozitia globala (World Space) a acestui punct aflat fix in centrul prmei
+        local pointInWorld = (pForm.CFrame * CFrame.new(localX, 0, localZ)).Position
+
+        -- Acum ne mutam la o inaltime globala ABSOLUTA deasupra acelui punct
+        local rayOrigin = pointInWorld + Vector3.new(0, 50, 0)
 
         local raycastParams = RaycastParams.new()
         raycastParams.FilterDescendantsInstances = {pForm}
         raycastParams.FilterType = Enum.RaycastFilterType.Include
 
+        -- Tragem o raza ABSOLUTA in jos
         local raycastResult = Workspace:Raycast(rayOrigin, Vector3.new(0, -100, 0), raycastParams)
 
         if raycastResult then
-            -- Pozitia pe Y exact pe platforma + jumate din inaltimea tipica a unui Dummy (aprox 3 studs ptr HumanoidRootPart)
+            -- Pozitia pe Y exact pe platforma + jumatate din inaltimea tipica a unui Dummy (aprox 3 studs ptr HumanoidRootPart)
             local finalPos = raycastResult.Position + Vector3.new(0, 3, 0)
-            -- Mentinem orientarea pe Y a platformei ca sa nu stea intr-o parte
-            local pivotCFrame = CFrame.new(finalPos) * CFrame.Angles(0, pForm.CFrame.Rotation.Y, 0)
+
+            -- Calculam un CFrame care doar se uita in fata, pentru a evita spawnarea in diagonala din cauza rotatiei platformei
+            -- Pastram rotatia Y a platformei doar vizual daca dorim, dar orientarea simpla este mai sigura.
+            local _, yAngle, _ = pForm.CFrame:ToEulerAnglesYXZ()
+            local pivotCFrame = CFrame.new(finalPos) * CFrame.Angles(0, yAngle, 0)
 
             local tooClose = false
             for _, otherDummy in ipairs(activeDummies) do
@@ -74,6 +82,7 @@ local function getValidRandomPosition(pForm)
             end
         end
     end
+    warn("TrainingManager: Failed to find valid position for Dummy!")
     return nil
 end
 
