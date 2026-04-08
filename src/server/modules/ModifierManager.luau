@@ -79,14 +79,16 @@ ModifierManager.Modifiers = {
             local map = Workspace:FindFirstChild("WholeMap") or Workspace:FindFirstChildWhichIsA("Model")
             if not map then return end
             for _, part in ipairs(map:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then
+                -- Verificăm explicit și după nume pentru siguranță, chiar dacă IsA("BasePart") acoperă și Uniunile.
+                if (part:IsA("BasePart") or part.Name == "BasePart") and part.CanCollide then
                     originalMapProperties[part] = originalMapProperties[part] or {}
                     -- Save original only if we haven't already saved it
                     if originalMapProperties[part].CustomPhysicalProperties == nil then
                         originalMapProperties[part].CustomPhysicalProperties = part.CustomPhysicalProperties or "DEFAULT"
                     end
-                    -- Friction 0, Restitution 0
-                    part.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0, 0, 1, 1)
+                    -- Pentru a asigura alunecarea pe orice material (inclusiv Studs/Neon care au friction custom),
+                    -- forțăm friction 0.01 și weight MARE (100) pentru a suprascrie fricțiunea picioarelor jucătorului.
+                    part.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.01, 0, 100, 1)
                 end
             end
         end,
