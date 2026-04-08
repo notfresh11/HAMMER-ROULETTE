@@ -333,20 +333,29 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
         -- Floor detection to be perfectly certain they touched the ground
         if isFalling and humanoid.Health > 0 and rootPart then
             -- Ensure a grace period has passed since we started falling/jumping (0.15 seconds)
-            -- On uneven terrain or "Studs" unions, Y velocity can fluctuate slightly around 0 when sliding/landing.
-            if rootPart.AssemblyLinearVelocity.Y <= 1 and (tick() - fallStartTick > 0.15) then
-                -- Folosim atat senzorul Roblox cat si un Raycast extins pentru a prinde orice material/denivelare
-                local isOnGround = humanoid.FloorMaterial ~= Enum.Material.Air
+            -- On uneven terrain or "Studs" unions, Y velocity bounces violently (can spike up to 5 studs/s upward) exactly as you touch the ground
+            if rootPart.AssemblyLinearVelocity.Y <= 10 and (tick() - fallStartTick > 0.15) then
+                local isOnGround = false
+                local currentState = humanoid:GetState()
+
+                -- Fast path: Engine officially declares we are on the floor
+                if currentState == Enum.HumanoidStateType.Landed or currentState == Enum.HumanoidStateType.Running then
+                    isOnGround = true
+                elseif humanoid.FloorMaterial ~= Enum.Material.Air then
+                    isOnGround = true
+                end
 
                 if not isOnGround then
+                    -- Robust fallback: Use a Blockcast instead of a thin Raycast to prevent slipping through Union cracks
                     local rayParams = RaycastParams.new()
                     rayParams.FilterType = Enum.RaycastFilterType.Exclude
                     rayParams.FilterDescendantsInstances = {character, hitboxPart}
 
-                    local rayOrigin = rootPart.Position
-                    -- Marim raza de la 3.5 la 4.5 pentru a acoperi diferentele masive de teren pe BasePart/Unions și slope-uri
+                    local boxSize = Vector3.new(2, 0.1, 2) -- Covers the width of the character's feet
+                    local boxCFrame = rootPart.CFrame
+                    -- 4.5 stud depth is large enough to cover HipHeight + minor terrain variations
                     local rayDirection = Vector3.new(0, -4.5, 0)
-                    local raycastResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+                    local raycastResult = Workspace:Blockcast(boxCFrame, boxSize, rayDirection, rayParams)
 
                     if raycastResult then
                         isOnGround = true
