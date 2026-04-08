@@ -85,8 +85,10 @@ end
 -- Get the RemoteEvent created by MainGameLoop
 local maceEventName = "MaceAttackEvent"
 local attackEvent = ReplicatedStorage:WaitForChild(maceEventName)
+local ModifierManager = require(script.Parent.ModifierManager)
 
-function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
+function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allMaceUsers)
+    allMaceUsers = allMaceUsers or {player}
     local roundActive = true
     local currentPlayer = player
     local connections = {}
@@ -152,12 +154,30 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
     AntiCheat.SetBypass(player, "Fly", 20)
     AntiCheat.SetBypass(player, "Speed", 20)
 
-    -- VFX: Highlight & Trail Setup
-    local highlight = Instance.new("Highlight")
-    highlight.FillTransparency = 1
-    highlight.OutlineColor = Color3.new(1, 0, 0) -- Roșu
-    highlight.OutlineTransparency = 0
-    highlight.Parent = character
+    -- Check Shadow Assassin modifier
+    local isShadowAssassin = ModifierManager.IsModifierActive("Shadow Assasin")
+    local isGhostParty = ModifierManager.IsModifierActive("Ghost Party")
+
+    if isShadowAssassin and not isGhostParty then
+        ModifierManager.ApplyGhostToCharacter(character, true, true)
+    elseif isGhostParty then
+        ModifierManager.ApplyGhostToCharacter(character, true, true)
+    else
+        -- VFX: Highlight & Trail Setup
+        local highlight = Instance.new("Highlight")
+        highlight.FillTransparency = 1
+        highlight.OutlineColor = Color3.new(1, 0, 0) -- Roșu
+        highlight.OutlineTransparency = 0
+        highlight.Parent = character
+    end
+
+    if currentTool and (isShadowAssassin or isGhostParty) then
+        for _, p in ipairs(currentTool:GetDescendants()) do
+            if p:IsA("BasePart") or p:IsA("Decal") then
+                p.Transparency = 1
+            end
+        end
+    end
 
     local attachTop = Instance.new("Attachment")
     attachTop.Position = Vector3.new(0, 1, 0)
@@ -235,10 +255,17 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
             hitboxPart:Destroy()
         end
 
+        local highlight = character and character:FindFirstChildWhichIsA("Highlight")
         if highlight then highlight:Destroy() end
+        if isShadowAssassin or isGhostParty then
+             if character then ModifierManager.ApplyGhostToCharacter(character, false) end
+        end
         if trail then trail:Destroy() end
         if attachTop then attachTop:Destroy() end
         if attachBottom then attachBottom:Destroy() end
+
+        -- Reapply baseline states based on active modifiers (Ghost Party, I cant see, Super Speed)
+        ModifierManager.ReapplyPlayerStates(player)
 
         if humanoid then
             humanoid.UseJumpPower = false
@@ -394,8 +421,20 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
             local hitChar = part:FindFirstAncestorWhichIsA("Model")
             if hitChar then
                 local hitHumanoid = hitChar:FindFirstChild("Humanoid")
-                if hitHumanoid and hitHumanoid.Health > 0 then
+                if hitHumanoid and hitHumanoid.Health > 0 and hitChar ~= character then
                     local hitPlayer = Players:GetPlayerFromCharacter(hitChar)
+
+                    -- Check Double/Triple Trouble friendly fire
+                    local isFriendlyFire = false
+                    if hitPlayer and table.find(allMaceUsers, hitPlayer) then
+                        isFriendlyFire = true
+                    end
+
+                    if isFriendlyFire then
+                        -- Just skip hit logic for friendly mace users
+                        continue
+                    end
+
                     if hitPlayer then
                         local victimHasShield = hitChar:GetAttribute("ShieldActive")
 
@@ -512,6 +551,27 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining)
                             local vfxEvent = ReplicatedStorage:FindFirstChild("VfxEvent")
                             if targetRoot and vfxEvent then
                                 vfxEvent:FireAllClients(targetRoot.Position, victimColors, groundColor, groundMaterial)
+                            end
+                        end
+
+                        -- SHOCKWAVE MODIFIER LOGIC
+                        if ModifierManager.IsModifierActive("Shockwave") then
+                            local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
+                            if targetRoot then
+                                local blastPos = targetRoot.Position
+                                for _, otherPlayer in ipairs(Players:GetPlayers()) do
+                                    if otherPlayer ~= player and otherPlayer.Character then
+                                        local otherRoot = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                        if otherRoot then
+                                            local dist = (otherRoot.Position - blastPos).Magnitude
+                                            if dist < 30 then
+                                                local dir = (otherRoot.Position - blastPos).Unit
+                                                if dir.Magnitude == 0 then dir = Vector3.new(0,1,0) end
+                                                otherRoot.AssemblyLinearVelocity = dir * 50 + Vector3.new(0, 30, 0)
+                                            end
+                                        end
+                                    end
+                                end
                             end
                         end
 
