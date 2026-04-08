@@ -285,7 +285,26 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
         end
     end
 
-    -- Track jumping/falling
+    -- Track explicitly when the player intentionally jumps
+    table.insert(connections, humanoid.Jumping:Connect(function(isActive)
+        if isActive and not hasStartedFalling then
+            hasStartedFalling = true
+            fallStartTick = tick()
+            maxJumpY = rootPart and rootPart.Position.Y or 0
+            trail.Enabled = true
+
+            -- Tăiem JumpHeight ca să nu poată ține Space apăsat la nesfârșit (Bunny Hop)
+            if not isTraining then
+                humanoid.JumpHeight = 0
+            else
+                local userId = player.UserId
+                if humanoid.JumpHeight > 30 then
+                    MaceMechanic.jumpCooldowns[userId] = tick()
+                    humanoid.JumpHeight = 7.2
+                end
+            end
+        end
+    end))
 
     -- Spatial query attack logic - AUTO HIT
 
@@ -309,31 +328,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
         local currentState = humanoid:GetState()
         local isCurrentlyInAir = (humanoid.FloorMaterial == Enum.Material.Air) or (currentState == Enum.HumanoidStateType.Freefall)
 
-        -- 1. Detect if the player has started jumping/falling
-        if not hasStartedFalling then
-            if isCurrentlyInAir then
-                hasStartedFalling = true
-                fallStartTick = tick()
-                maxJumpY = rootPart and rootPart.Position.Y or 0
-                trail.Enabled = true
-
-                -- Tăiem JumpHeight ca să nu poată ține Space apăsat la nesfârșit (Bunny Hop)
-                if not isTraining then
-                    humanoid.JumpHeight = 0
-                else
-                    local userId = player.UserId
-                    if humanoid.JumpHeight > 30 then
-                        MaceMechanic.jumpCooldowns[userId] = tick()
-                        humanoid.JumpHeight = 7.2
-                    end
-                end
-            end
-
-            -- If they haven't jumped yet, we still check for hits in case they walk into someone
-            -- But we don't end the round.
-        end
-
-        -- 2. Once they are in the air, update max height
+        -- Once they have explicitly jumped, update max height while they are still in the air
         if hasStartedFalling and isCurrentlyInAir and rootPart and rootPart.Position.Y > maxJumpY then
             maxJumpY = rootPart.Position.Y
         end
