@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
+local MapManager = require(script.Parent.MapManager)
 
 local activeModifiers = {}
 local modifierConnections = {}
@@ -30,10 +31,11 @@ ModifierManager.Modifiers = {
     ["Invisible platform"] = {
         Name = "Invisible platform",
         Apply = function()
-            local map = Workspace:FindFirstChild("WholeMap") or Workspace:FindFirstChildWhichIsA("Model")
+            local map = MapManager.getCurrentMap()
             if not map then return end
             for _, part in ipairs(map:GetDescendants()) do
-                if part:IsA("BasePart") and part.Name ~= "SpawnMap" and part.Name ~= "Zone" and part.Transparency < 1 then
+                -- Verificăm special dacă este BasePart sau o Uniune care funcționează ca teren
+                if (part:IsA("BasePart") or part.Name == "BasePart") and part.Name ~= "SpawnMap" and part.Name ~= "Zone" and part.Transparency < 1 then
                     originalMapProperties[part] = originalMapProperties[part] or {}
                     originalMapProperties[part].Transparency = part.Transparency
                     part.Transparency = 1
@@ -76,7 +78,7 @@ ModifierManager.Modifiers = {
     ["Icyy"] = {
         Name = "Icyy",
         Apply = function()
-            local map = Workspace:FindFirstChild("WholeMap") or Workspace:FindFirstChildWhichIsA("Model")
+            local map = MapManager.getCurrentMap()
             if not map then return end
             for _, part in ipairs(map:GetDescendants()) do
                 -- Verificăm explicit și după nume pentru siguranță, chiar dacă IsA("BasePart") acoperă și Uniunile.
@@ -228,11 +230,11 @@ ModifierManager.Modifiers = {
             local discoConn
             discoConn = RunService.Heartbeat:Connect(function()
                 if math.random() < 0.1 then -- limit frequency
-                    local map = Workspace:FindFirstChild("WholeMap") or Workspace:FindFirstChildWhichIsA("Model")
+                    local map = MapManager.getCurrentMap()
                     if map then
                         local parts = {}
                         for _, p in ipairs(map:GetDescendants()) do
-                            if p:IsA("BasePart") and p.Name ~= "SpawnMap" and p.Name ~= "Zone" and p.Transparency < 1 then
+                            if (p:IsA("BasePart") or p.Name == "BasePart") and p.Name ~= "SpawnMap" and p.Name ~= "Zone" and p.Transparency < 1 then
                                 table.insert(parts, p)
                             end
                         end
