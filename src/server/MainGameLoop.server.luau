@@ -253,10 +253,14 @@ local function gameLoop()
                     task.wait(5)
                 else
                     warn("MainLoop: Nu s-a putut alege un jucător!")
+                    setPlayersAnchored(activePlayers, false)
                     task.wait(5)
                     break
                 end
             end -- End of Round Loop
+
+                -- Failsafe: Ensure everyone is unanchored when the match ends
+                setPlayersAnchored(activePlayers, false)
 
                 if disconnectConnection then
                     disconnectConnection:Disconnect()
