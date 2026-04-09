@@ -190,6 +190,7 @@ local function gameLoop()
 
             -- Bucla de Runde (cât timp sunt cel puțin 2 supraviețuitori în meci)
             local isFirstRound = true
+            local isTeleportFirstRound = true
             while #activePlayers > 1 do
                 print("MainLoop: Începem o NOUĂ RUNDĂ cu " .. #activePlayers .. " supraviețuitori.")
 
@@ -215,22 +216,101 @@ local function gameLoop()
                     numMaces = math.max(1, #activePlayers - 1)
                 end
 
-                -- Adjust Map Hammers based on numMaces
-                currentMap, currentHammer = MapManager.chooseAndSpawnMap(numMaces)
+                -- The map is already spawned at the start of the match.
+                -- However, we still need to spawn/update the visual Hammers for roulette
+                -- based on the current numMaces (which can change between rounds due to modifiers).
+                -- Since we do NOT want to change the arena entirely, we will just manage the hammers.
+                -- MapManager.chooseAndSpawnMap takes down the entire map, which we want to avoid.
+
+                if currentMap then
+                    -- Just re-spawn hammers on the existing map
+                    if currentHammer then
+                        if type(currentHammer) == "table" then
+                            for _, h in ipairs(currentHammer) do h:Destroy() end
+                        else
+                            currentHammer:Destroy()
+                        end
+                        currentHammer = nil
+                    end
+
+                    local hammerSpawnFolder = currentMap:FindFirstChild("HammerSpawn")
+                    local hammerSpawnPart = nil
+                    if hammerSpawnFolder then
+                        hammerSpawnPart = hammerSpawnFolder:FindFirstChildWhichIsA("BasePart")
+                    end
+
+                    local hammerModelTemplate = game:GetService("ServerStorage"):FindFirstChild("MapStorage"):FindFirstChild("HammerModel")
+                    if hammerModelTemplate and hammerSpawnPart then
+                        currentHammer = {}
+                        local isModel = hammerModelTemplate:IsA("Model")
+                        local hammerHeight = 1
+
+                        if isModel then
+                            local primary = hammerModelTemplate.PrimaryPart or hammerModelTemplate:FindFirstChildWhichIsA("BasePart", true)
+                            if primary then hammerHeight = primary.Size.Z / 2 end
+                        elseif hammerModelTemplate:IsA("BasePart") then
+                            hammerHeight = hammerModelTemplate.Size.Z / 2
+                        end
+
+                        local radius = numMaces > 1 and 3 or 0
+
+                        for i = 1, numMaces do
+                            local hammerInst = hammerModelTemplate:Clone()
+                            hammerInst.Parent = Workspace
+
+                            if isModel then
+                                if not hammerInst.PrimaryPart then
+                                    hammerInst.PrimaryPart = hammerInst:FindFirstChildWhichIsA("BasePart", true)
+                                end
+                                for _, part in ipairs(hammerInst:GetDescendants()) do
+                                    if part:IsA("BasePart") then
+                                        part.Anchored = true
+                                        part.CanCollide = false
+                                    end
+                                end
+                            else
+                                hammerInst.Anchored = true
+                                hammerInst.CanCollide = false
+                            end
+
+                            local angle = (math.pi * 2 / numMaces) * i
+                            local offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+                            local targetHammerCFrame = hammerSpawnPart.CFrame * CFrame.new(offset) * CFrame.new(0, (hammerSpawnPart.Size.Y/2) + hammerHeight, 0) * CFrame.Angles(math.rad(90), 0, 0)
+
+                            if isModel and hammerInst.PrimaryPart then
+                                hammerInst:PivotTo(targetHammerCFrame)
+                            elseif hammerInst:IsA("BasePart") then
+                                hammerInst.CFrame = targetHammerCFrame
+                            end
+
+                            table.insert(currentHammer, hammerInst)
+                        end
+                    end
+
+                    if currentHammer and #currentHammer == 1 then
+                        currentHammer = currentHammer[1]
+                    end
+                end
 
                 -- Ensure hammer is visible at round start
                 if type(currentHammer) == "table" then
                     for _, h in ipairs(currentHammer) do setHammerVisibility(h, true) end
-                else
+                elseif currentHammer then
                     setHammerVisibility(currentHammer, true)
                 end
 
-                Matchmaking.teleportPlayersToSpawns(activePlayers, currentMap)
+                -- Only teleport players to spawns on the FIRST round.
+                -- Otherwise they stay in the arena where they are.
+                if isTeleportFirstRound then
+                    Matchmaking.teleportPlayersToSpawns(activePlayers, currentMap)
+                end
 
                 -- Block player movement while roulette spins
                 setPlayersAnchored(activePlayers, true)
 
                 task.wait(1) -- small delay for physics/camera to settle
+
+                isTeleportFirstRound = false
 
                 local chosenPlayers = Roulette.selectMaceBearers(activePlayers, numMaces)
 
