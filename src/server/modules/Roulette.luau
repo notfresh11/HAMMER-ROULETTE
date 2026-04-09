@@ -197,7 +197,13 @@ function Roulette.playRouletteAnimation(targetPlayers, currentHammerInstances)
 
     task.wait(SPIN_DURATION)
 
+    local ModifierManager = require(script.Parent.ModifierManager)
     local msg = table.concat(names, " & ") .. " got the Mace!"
+
+    if ModifierManager.IsModifierActive("Streamsnipe") then
+        msg = table.concat(names, " & ") .. " did NOT get the Mace!"
+    end
+
     showTextEvent:FireAllClients(msg, Color3.new(0, 1, 0), START_SOUND)
     task.delay(2, function()
         hideTextEvent:FireAllClients()

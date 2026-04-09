@@ -11,6 +11,21 @@ local AntiCheat = require(script.Parent.AntiCheat)
 MaceMechanic.playerCleanups = {}
 
 
+-- Ensure Events exist
+local vfxEvent = ReplicatedStorage:FindFirstChild("VfxEvent")
+if not vfxEvent then
+    vfxEvent = Instance.new("RemoteEvent")
+    vfxEvent.Name = "VfxEvent"
+    vfxEvent.Parent = ReplicatedStorage
+end
+
+local shockwaveEvent = ReplicatedStorage:FindFirstChild("ShockwaveVfxEvent")
+if not shockwaveEvent then
+    shockwaveEvent = Instance.new("RemoteEvent")
+    shockwaveEvent.Name = "ShockwaveVfxEvent"
+    shockwaveEvent.Parent = ReplicatedStorage
+end
+
 -- Hit Sounds Setup
 local hitSoundIds = {
     "rbxassetid://77574533044558",
@@ -112,6 +127,15 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
         local toolTemplate = hammerFolder:WaitForChild("Tool", 5)
         if toolTemplate and toolTemplate:IsA("Tool") then
             currentTool = toolTemplate:Clone()
+
+            if ModifierManager.IsModifierActive("Impostor") then
+                for _, part in ipairs(currentTool:GetDescendants()) do
+                    if part:IsA("BasePart") or part:IsA("Decal") then
+                        part.Transparency = 1
+                    end
+                end
+            end
+
             currentTool.Parent = player.Backpack
             humanoid:EquipTool(currentTool)
         else
@@ -300,9 +324,15 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
 
             -- Tăiem JumpHeight ca să nu poată ține Space apăsat la nesfârșit (Bunny Hop)
             if not isTraining then
-                humanoid.JumpHeight = 0
-                -- Dezactivăm complet motorul de săritură pentru a preveni input spam la aterizare
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+                local isSuddenDeath = ModifierManager.IsModifierActive("SuddenDeath")
+                if not isSuddenDeath then
+                    humanoid.JumpHeight = 0
+                    -- Dezactivăm complet motorul de săritură pentru a preveni input spam la aterizare
+                    humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+                else
+                    -- SuddenDeath: păstrăm JumpHeight la 40 și lăsăm Jumping activ
+                    humanoid.JumpHeight = 40
+                end
             else
                 local userId = player.UserId
                 if humanoid.JumpHeight > 30 then
@@ -394,12 +424,21 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                             humanoid.JumpHeight = 7.2
                         end
                     else
-                        -- Nu mai punem delay de 0.05 secunde, cand pica, e instant over
-                        if roundActive then
-                            print(player.Name .. " a aterizat si runda se reseteaza!")
-                            cleanup()
-                            if onRoundEndCallback then
-                                onRoundEndCallback()
+                        local isSuddenDeath = ModifierManager.IsModifierActive("SuddenDeath")
+                        if isSuddenDeath then
+                            -- În SuddenDeath nu se resetează runda când aterizezi, are infinite sărituri de la sol
+                            if humanoid then
+                                humanoid.JumpHeight = 40
+                            end
+                            hasStartedFalling = false
+                        else
+                            -- Nu mai punem delay de 0.05 secunde, cand pica, e instant over
+                            if roundActive then
+                                print(player.Name .. " a aterizat si runda se reseteaza!")
+                                cleanup()
+                                if onRoundEndCallback then
+                                    onRoundEndCallback()
+                                end
                             end
                         end
                     end
@@ -574,7 +613,6 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                             end
 
                             -- Trigger VFX pe toți clienții
-                            local vfxEvent = ReplicatedStorage:FindFirstChild("VfxEvent")
                             if targetRoot and vfxEvent then
                                 vfxEvent:FireAllClients(targetRoot.Position, victimColors, groundColor, groundMaterial)
                             end
@@ -582,13 +620,6 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
 
                         -- SHOCKWAVE MODIFIER LOGIC
                         if ModifierManager.IsModifierActive("Shockwave") then
-                            -- Ensure the RemoteEvent exists
-                            local shockwaveEvent = ReplicatedStorage:FindFirstChild("ShockwaveVfxEvent")
-                            if not shockwaveEvent then
-                                shockwaveEvent = Instance.new("RemoteEvent")
-                                shockwaveEvent.Name = "ShockwaveVfxEvent"
-                                shockwaveEvent.Parent = ReplicatedStorage
-                            end
                             local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
                             if targetRoot then
                                 local blastPos = targetRoot.Position
@@ -727,7 +758,6 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                             end
                         end
 
-                        local vfxEvent = ReplicatedStorage:FindFirstChild("VfxEvent")
                         if targetRoot and vfxEvent then
                             vfxEvent:FireAllClients(targetRoot.Position, victimColors, groundColor, groundMaterial)
                         end
@@ -788,7 +818,10 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
             -- Dar o ținem dezactivată până el chiar trebuie să sară iar (ca să prevină spam-ul din zbor)
             -- Nu facem enable aici, el oricum primește bounce-ul prin script, nu fizic!
             if not isTraining then
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+                local isSuddenDeath = ModifierManager.IsModifierActive("SuddenDeath")
+                if not isSuddenDeath then
+                    humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+                end
             end
         end
     end))

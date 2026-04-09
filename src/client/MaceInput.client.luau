@@ -59,6 +59,32 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     -- Don't process if typing in chat, etc.
     if gameProcessed then return end
 
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local character = player.Character
+        local tool = character and character:FindFirstChildOfClass("Tool")
+        if tool and tool.Name == "BeachBall" then
+            local throwEvent = ReplicatedStorage:FindFirstChild("BeachBallThrowEvent")
+            if throwEvent then
+                -- Get cursor direction
+                if mouse.Hit then
+                    throwEvent:FireServer(mouse.Hit.Position)
+                end
+            end
+        elseif tool and tool.Name == "HotPotatoTool" then
+            local passEvent = ReplicatedStorage:FindFirstChild("HotPotatoPassEvent")
+            if passEvent then
+                if mouse.Hit then
+                    passEvent:FireServer(mouse.Hit.Position)
+                end
+            end
+        else
+            local knockbackEvent = ReplicatedStorage:FindFirstChild("KnockbackClickEvent")
+            if knockbackEvent then
+                knockbackEvent:FireServer()
+            end
+        end
+    end
+
     if input.KeyCode == Enum.KeyCode.L then
         -- Toggle Debug Hitbox visibility
         debugHitboxVisible = not debugHitboxVisible

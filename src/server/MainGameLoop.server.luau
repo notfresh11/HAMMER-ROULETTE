@@ -36,6 +36,7 @@ end)
 local Matchmaking = require(script.Parent.modules.Matchmaking)
 local Roulette = require(script.Parent.modules.Roulette)
 local MaceMechanic = require(script.Parent.modules.MaceMechanic)
+local HotPotatoMechanic = require(script.Parent.modules.HotPotatoMechanic)
 local MapManager = require(script.Parent.modules.MapManager)
 local DataManager = require(script.Parent.modules.DataManager)
 local ProgressionManager = require(script.Parent.modules.ProgressionManager)
@@ -194,13 +195,21 @@ local function gameLoop()
                 print("MainLoop: Începem o NOUĂ RUNDĂ cu " .. #activePlayers .. " supraviețuitori.")
 
                 if not isFirstRound then
+                    ModifierManager.ClearRoundModifiers()
                     ModifierManager.PickAndAddModifier(#activePlayers)
                 end
                 isFirstRound = false
 
                 -- Ensure all players have correct baseline stats updated for the new modifier
+                local isRandomStrategy = ModifierManager.IsModifierActive("Random Strategy")
+
                 for _, player in ipairs(activePlayers) do
                     ModifierManager.ReapplyPlayerStates(player)
+
+                    if isRandomStrategy then
+                        AbilityManager.EquipRandomAbility(player)
+                    end
+
                     -- Force Reset Scales for Grow/Shrink Modifier
                     if player.Character then
                         local hum = player.Character:FindFirstChild("Humanoid")
@@ -216,8 +225,12 @@ local function gameLoop()
                     end
                 end
 
+                local isStreamsnipe = ModifierManager.IsModifierActive("Streamsnipe")
+
                 local numMaces = 1
-                if ModifierManager.IsModifierActive("Triple Trouble !") then
+                if isStreamsnipe then
+                    numMaces = math.max(1, #activePlayers - 1)
+                elseif ModifierManager.IsModifierActive("Triple Trouble !") then
                     numMaces = 3
                 elseif ModifierManager.IsModifierActive("Double Trouble !") then
                     numMaces = 2
@@ -322,7 +335,20 @@ local function gameLoop()
                 local chosenPlayers = Roulette.selectMaceBearers(activePlayers, numMaces)
 
                 if #chosenPlayers > 0 then
-                    Roulette.playRouletteAnimation(chosenPlayers, currentHammer)
+                    local targetAnimPlayers = chosenPlayers
+                    if isStreamsnipe then
+                        local nonMaceUser = nil
+                        for _, p in ipairs(activePlayers) do
+                            if not table.find(chosenPlayers, p) then
+                                nonMaceUser = p
+                                break
+                            end
+                        end
+                        if nonMaceUser then
+                            targetAnimPlayers = {nonMaceUser}
+                        end
+                    end
+                    Roulette.playRouletteAnimation(targetAnimPlayers, currentHammer)
 
                     -- Unblock movement now that roulette has finished
                     setPlayersAnchored(activePlayers, false)
@@ -350,6 +376,16 @@ local function gameLoop()
 
                     -- Conectăm un event rapid ca să știm dacă cineva din activePlayers a murit în această rundă
                     local deathConnections = {}
+                    local nonMaceUser = nil
+                    if isStreamsnipe then
+                        for _, p in ipairs(activePlayers) do
+                            if not table.find(chosenPlayers, p) then
+                                nonMaceUser = p
+                                break
+                            end
+                        end
+                    end
+
                     for _, player in ipairs(activePlayers) do
                         if player.Character and player.Character:FindFirstChild("Humanoid") then
                             table.insert(deathConnections, player.Character.Humanoid.Died:Connect(function()
@@ -366,13 +402,44 @@ local function gameLoop()
                                     if toggleMainUiEvent then
                                         toggleMainUiEvent:FireClient(player, true)
                                     end
+
+                                    if isStreamsnipe and nonMaceUser and player == nonMaceUser then
+                                        print("MainLoop: Non-mace user died in Streamsnipe. Round ends.")
+                                        roundEnded = true
+                                    end
+
+                                    if ModifierManager.IsModifierActive("SuddenDeath") then
+                                        print("MainLoop: A player died during SuddenDeath. Round ends.")
+                                        roundEnded = true
+                                    end
                                 end
                             end))
                         end
                     end
 
                     for _, chosenPlayer in ipairs(chosenPlayers) do
-                        MaceMechanic.startMechanic(chosenPlayer, onAttackerFinished, false, chosenPlayers)
+                        if ModifierManager.IsModifierActive("Hot Potato") then
+                            HotPotatoMechanic.startMechanic(chosenPlayer, onAttackerFinished, activePlayers)
+                        else
+                            MaceMechanic.startMechanic(chosenPlayer, onAttackerFinished, false, chosenPlayers)
+                        end
+                    end
+
+                    if ModifierManager.IsModifierActive("Beach Episode") then
+                        local ServerStorage = game:GetService("ServerStorage")
+                        local beachBallFolder = ServerStorage:FindFirstChild("BeachBall")
+                        if beachBallFolder then
+                            local ballTool = beachBallFolder:FindFirstChild("Tool")
+                            if ballTool then
+                                for _, player in ipairs(activePlayers) do
+                                    if not table.find(chosenPlayers, player) then
+                                        local clone = ballTool:Clone()
+                                        clone.Name = "BeachBall"
+                                        clone.Parent = player.Backpack
+                                    end
+                                end
+                            end
+                        end
                     end
 
                     local heartbeatConn
@@ -403,6 +470,15 @@ local function gameLoop()
                     end
                     table.clear(deathConnections)
 
+                    for _, p in ipairs(activePlayers) do
+                        local tool = p.Backpack:FindFirstChild("BeachBall")
+                        if tool then tool:Destroy() end
+                        if p.Character then
+                            local charTool = p.Character:FindFirstChild("BeachBall")
+                            if charTool then charTool:Destroy() end
+                        end
+                    end
+
                     print("MainLoop: Runda s-a încheiat. Așteptăm cooldown 5 secunde...")
                     task.wait(5)
                 else
@@ -423,6 +499,13 @@ local function gameLoop()
                 -- Force cleanup of the mechanic in case a round ended abruptly (e.g. opponent died, leaving only the attacker)
                 if MaceMechanic.forceStopMechanic then
                     MaceMechanic.forceStopMechanic()
+                end
+                if HotPotatoMechanic.forceStopMechanic then
+                    HotPotatoMechanic.forceStopMechanic()
+                end
+
+                for _, p in ipairs(Players:GetPlayers()) do
+                    AbilityManager.RestoreOriginalAbility(p)
                 end
 
                 ModifierManager.ClearAllModifiers()
