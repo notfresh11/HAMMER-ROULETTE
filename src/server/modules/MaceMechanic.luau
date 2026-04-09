@@ -208,12 +208,13 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
     local maxJumpY = 0 -- Reține înălțimea maximă atinsă în săritură pentru a preveni kill-urile false
     local AUTO_HIT_COOLDOWN = 0.5
     local lastHitTick = 0
+    local spawnTick = tick() -- Folosit pentru a preveni insta-death-ul la deblocarea caracterului
 
     -- Create Permanent Hitbox Part
     local hitboxPart = Instance.new("Part")
     hitboxPart.Name = "MaceHitbox"
-    -- Mărime redusă conform cerinței (9x9x9)
-    hitboxPart.Size = Vector3.new(9, 9, 9)
+    -- Mărime mult mai subțire orizontal pentru a necesita precizie
+    hitboxPart.Size = Vector3.new(4, 9, 4)
     -- Centrat puțin mai jos de RootPart ca să acopere zona de impact
     hitboxPart.CFrame = rootPart.CFrame * CFrame.new(0, -4, 0)
     hitboxPart.Anchored = false
@@ -348,7 +349,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
         end
 
         -- Am eliminat complet hasStartedFalling. Verificăm doar dacă e viu și are rootPart
-        if humanoid.Health > 0 and rootPart then
+        -- Adăugăm imunitate de 1 secundă la spawn pentru a ignora micro-căderile de la un-anchor
+        if humanoid.Health > 0 and rootPart and (tick() - spawnTick > 1) then
             -- Position-based grace period: Jucătorul trebuie să fi coborât cel puțin 0.5 studs de la înălțimea maximă atinsă
             -- SAU să fi trecut măcar 0.25 secunde de la momentul săriturii pentru a ieși din frame-ul inițial de la sol
             local timeSinceJump = tick() - fallStartTick
@@ -454,6 +456,12 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                     end
 
                     if hitPlayer then
+                        -- Strict Y-axis check: the attacker's RootPart must be significantly above the victim's RootPart
+                        local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
+                        if not targetRoot or rootPart.Position.Y <= targetRoot.Position.Y + 2.5 then
+                            continue -- Ignore hits that are side-by-side or from below
+                        end
+
                         local victimHasShield = hitChar:GetAttribute("ShieldActive")
 
                         -- KILL OR SHIELD BREAK!
@@ -637,6 +645,12 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                         -- Odată ce a lovit în acest cadru, e de ajuns
                         break
                     elseif hitChar.Name == "Dummy" and hitHumanoid and hitHumanoid.Health > 0 then
+                        -- Strict Y-axis check for dummy too
+                        local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
+                        if not targetRoot or rootPart.Position.Y <= targetRoot.Position.Y + 2.5 then
+                            continue
+                        end
+
                         -- Handle Dummy Hit
                         local victimColors = {}
                         if isTraining then
