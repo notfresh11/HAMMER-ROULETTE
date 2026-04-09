@@ -91,15 +91,15 @@ ModifierManager.Modifiers = {
                         originalMapProperties[part].CustomPhysicalProperties = part.CustomPhysicalProperties or "DEFAULT"
                     end
                     -- Pentru a asigura alunecarea pe orice material (inclusiv Studs/Neon care au friction custom),
-                    -- forțăm friction 0.01 și weight MARE (100) pentru a suprascrie fricțiunea picioarelor jucătorului.
-                    part.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.01, 0, 100, 1)
+                    -- forțăm friction 0 absolut și weight MARE (100) pentru a suprascrie fricțiunea picioarelor jucătorului.
+                    part.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0, 0, 100, 100)
                 end
             end
             for _, player in ipairs(Players:GetPlayers()) do
                 if player.Character then
-                    for _, part in ipairs(player.Character:GetChildren()) do
+                    for _, part in ipairs(player.Character:GetDescendants()) do
                         if part:IsA("BasePart") then
-                            part.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.01, 0, 100, 1)
+                            part.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0, 0, 100, 100)
                         end
                     end
                 end
@@ -324,7 +324,9 @@ function ModifierManager.ApplyGhostToCharacter(character, isGhost, isMaceUser)
                 if not part:GetAttribute("OrigTransparency") then
                     part:SetAttribute("OrigTransparency", part.Transparency)
                 end
-                part.Transparency = 1
+                -- To make the highlight visible, the part transparency must NOT be exactly 1
+                -- 0.99 transparency makes it effectively invisible but still allows Highlight rendering
+                part.Transparency = 0.99
             else
                 local orig = part:GetAttribute("OrigTransparency")
                 if orig then
@@ -337,7 +339,7 @@ function ModifierManager.ApplyGhostToCharacter(character, isGhost, isMaceUser)
                 if not part:GetAttribute("OrigTransparency") then
                     part:SetAttribute("OrigTransparency", part.Transparency)
                 end
-                part.Transparency = 1
+                part.Transparency = 0.99
             else
                 local orig = part:GetAttribute("OrigTransparency")
                 if orig then

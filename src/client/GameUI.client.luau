@@ -1023,11 +1023,11 @@ if shockwaveEvent then
         shock.CanQuery = false
         shock.Parent = Workspace
 
-        local tween = TweenService:Create(shock, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = Vector3.new(0.5, 30, 30),
+        local tween = TweenService:Create(shock, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = Vector3.new(2, 80, 80),
             Transparency = 1
         })
         tween:Play()
-        Debris:AddItem(shock, 0.5)
+        Debris:AddItem(shock, 1.2)
     end)
 end
