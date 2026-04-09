@@ -102,13 +102,38 @@ function Matchmaking.teleportPlayersToSpawns(activePlayers, currentMapInstance)
                             local spawnIndex = ((index - 1) % #spawns) + 1
                             local chosenSpawn = spawns[spawnIndex]
 
-                            -- Calculate exact floor placement
-                            -- Y offset = (Spawn Height / 2) + (RootPart Height / 2) + Humanoid HipHeight (which is usually around 2 studs for R15)
+                            -- Find the true floor using a raycast from high above the spawn part
                             local humanoid = character:WaitForChild("Humanoid", 5)
                             local hipHeight = humanoid and humanoid.HipHeight or 2
-                            local yOffset = (chosenSpawn.Size.Y / 2) + (rootPart.Size.Y / 2) + hipHeight
+                            local rootHeightOffset = (rootPart.Size.Y / 2) + hipHeight
 
-                            targetCFrame = CFrame.new(chosenSpawn.Position + Vector3.new(0, yOffset, 0))
+                            local rayOrigin = chosenSpawn.Position + Vector3.new(0, 50, 0)
+                            local rayDirection = Vector3.new(0, -100, 0)
+
+                            local rayParams = RaycastParams.new()
+                            rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+                            -- We exclude the chosenSpawn so the raycast ignores the invisible pad and hits the actual baseplate/platform underneath
+                            local ignoreList = {chosenSpawn, character}
+                            local spawnFolder = currentMapInstance and currentMapInstance:FindFirstChild("PlayerSpawn")
+                            if spawnFolder then
+                                -- Ignore all spawn parts
+                                for _, sp in ipairs(spawnFolder:GetDescendants()) do
+                                    table.insert(ignoreList, sp)
+                                end
+                            end
+                            rayParams.FilterDescendantsInstances = ignoreList
+
+                            local trueFloorHit = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+
+                            if trueFloorHit then
+                                -- Teleport flush with the solid floor
+                                targetCFrame = CFrame.new(trueFloorHit.Position + Vector3.new(0, rootHeightOffset + 0.05, 0))
+                            else
+                                -- Fallback if raycast fails
+                                local yOffset = (chosenSpawn.Size.Y / 2) + rootHeightOffset
+                                targetCFrame = CFrame.new(chosenSpawn.Position + Vector3.new(0, yOffset, 0))
+                            end
                         else
                             targetCFrame = CFrame.new((index - 1) * 5, 50, 0)
                         end
