@@ -273,6 +273,7 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
         if humanoid then
             humanoid.UseJumpPower = false
             humanoid.JumpHeight = 7.2
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
         end
 
         MaceMechanic.playerCleanups[player] = nil
@@ -299,6 +300,8 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
             -- Tăiem JumpHeight ca să nu poată ține Space apăsat la nesfârșit (Bunny Hop)
             if not isTraining then
                 humanoid.JumpHeight = 0
+                -- Dezactivăm complet motorul de săritură pentru a preveni input spam la aterizare
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
             else
                 local userId = player.UserId
                 if humanoid.JumpHeight > 30 then
@@ -414,9 +417,9 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
         end
 
         -- PREVINE INSTA-KILL LA ATERIZARE SAU MERS:
-        -- Trebuie să fi căzut măcar 10 studs de la punctul maxim atins pentru ca hitbox-ul să fie "letal"
+        -- Trebuie să fi căzut măcar 3 studs de la punctul maxim atins pentru ca hitbox-ul să fie "letal"
         local fallDistance = maxJumpY - (rootPart and rootPart.Position.Y or maxJumpY)
-        if fallDistance < 10 and not pendingLandingEnd then
+        if fallDistance < 3 and not pendingLandingEnd then
             -- Daca nu a căzut destul și nici nu a lovit în milisecunda imediată după aterizare, nu face nimic
             return
         end
@@ -748,6 +751,13 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
 
             if humanoid.JumpHeight == 0 then
                 humanoid.JumpHeight = 40
+            end
+
+            -- Re-activăm săritura dacă era oprită, pentru a permite următorul hit
+            -- Dar o ținem dezactivată până el chiar trebuie să sară iar (ca să prevină spam-ul din zbor)
+            -- Nu facem enable aici, el oricum primește bounce-ul prin script, nu fizic!
+            if not isTraining then
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
             end
         end
     end))
