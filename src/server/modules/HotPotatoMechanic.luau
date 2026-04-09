@@ -4,6 +4,15 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 
+HotPotatoMechanic.cleanups = {}
+
+HotPotatoMechanic.forceStopMechanic = function()
+    for _, cleanup in pairs(HotPotatoMechanic.cleanups) do
+        cleanup()
+    end
+    table.clear(HotPotatoMechanic.cleanups)
+end
+
 function HotPotatoMechanic.startMechanic(player, onRoundEndCallback, activePlayers)
     local character = player.Character
     if not character then return end
@@ -13,7 +22,7 @@ function HotPotatoMechanic.startMechanic(player, onRoundEndCallback, activePlaye
     local potatoFolder = ServerStorage:FindFirstChild("HotPotato")
     if not potatoFolder then return end
 
-    local toolTemplate = potatoFolder:FindFirstChild("Tool")
+    local toolTemplate = potatoFolder:FindFirstChild("HotPotato") or potatoFolder:FindFirstChild("Tool")
     if not toolTemplate then return end
 
     local currentTool = toolTemplate:Clone()
@@ -33,15 +42,18 @@ function HotPotatoMechanic.startMechanic(player, onRoundEndCallback, activePlaye
     local potatoHolder = player
     local mechanicActive = true
 
-    -- Expose stop function
-    HotPotatoMechanic.forceStopMechanic = function()
+    local function cleanupFunc()
         mechanicActive = false
-        updateTimerEvent:FireAllClients(-1) -- Hide UI
+        updateTimerEvent:FireAllClients(-1, potatoHolder and potatoHolder.Name or "") -- Hide UI specific to this
         if potatoHolder and potatoHolder.Character then
             local tool = potatoHolder.Character:FindFirstChild("HotPotatoTool") or potatoHolder.Backpack:FindFirstChild("HotPotatoTool")
             if tool then tool:Destroy() end
         end
+        if passConn then passConn:Disconnect() end
+        HotPotatoMechanic.cleanups[player] = nil
     end
+
+    HotPotatoMechanic.cleanups[player] = cleanupFunc
 
     -- Server connection for passing potato
     local passEvent = ReplicatedStorage:FindFirstChild("HotPotatoPassEvent")
@@ -108,9 +120,10 @@ function HotPotatoMechanic.startMechanic(player, onRoundEndCallback, activePlaye
         end
 
         if mechanicActive then
-            updateTimerEvent:FireAllClients(-1) -- Hide UI
+            updateTimerEvent:FireAllClients(-1, potatoHolder and potatoHolder.Name or "") -- Hide UI
             passConn:Disconnect()
             mechanicActive = false
+            HotPotatoMechanic.cleanups[player] = nil
 
             -- Explode
             if potatoHolder and potatoHolder.Character then

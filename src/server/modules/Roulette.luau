@@ -200,7 +200,9 @@ function Roulette.playRouletteAnimation(targetPlayers, currentHammerInstances)
     local ModifierManager = require(script.Parent.ModifierManager)
     local msg = table.concat(names, " & ") .. " got the Mace!"
 
-    if ModifierManager.IsModifierActive("Streamsnipe") then
+    if ModifierManager.IsModifierActive("Hot Potato") then
+        msg = table.concat(names, " & ") .. " got the Hot Potato!"
+    elseif ModifierManager.IsModifierActive("Streamsnipe") then
         msg = table.concat(names, " & ") .. " did NOT get the Mace!"
     end
 
