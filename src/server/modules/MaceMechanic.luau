@@ -134,6 +134,13 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                         part.Transparency = 1
                     end
                 end
+
+                -- Pentru a anula animația implicită de braț întins a Roblox-ului
+                currentTool.RequiresHandle = false
+                local handle = currentTool:FindFirstChild("Handle")
+                if handle then
+                    handle.Name = "InvisibleHandle"
+                end
             end
 
             currentTool.Parent = player.Backpack

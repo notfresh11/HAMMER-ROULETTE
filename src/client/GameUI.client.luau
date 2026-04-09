@@ -1024,12 +1024,57 @@ end
 
 local updateTimerEvent = ReplicatedStorage:WaitForChild("HotPotatoTimerEvent", 10)
 if updateTimerEvent then
+    local activePotatoes = {}
+
+    -- Clear all every 1.5 seconds if they stop sending updates
+    task.spawn(function()
+        while true do
+            local now = tick()
+            local changed = false
+            for k, v in pairs(activePotatoes) do
+                if now - v.lastUpdate > 1.5 then
+                    activePotatoes[k] = nil
+                    changed = true
+                end
+            end
+            if changed then
+                local strs = {}
+                for k, v in pairs(activePotatoes) do
+                    table.insert(strs, k .. " (" .. tostring(v.timer) .. "s)")
+                end
+                if #strs > 0 then
+                    hotPotatoLabel.Visible = true
+                    hotPotatoLabel.Text = "Hot Potato: " .. table.concat(strs, " | ")
+                else
+                    hotPotatoLabel.Visible = false
+                end
+            end
+            task.wait(0.5)
+        end
+    end)
+
     updateTimerEvent.OnClientEvent:Connect(function(timer, holderName)
         if timer < 0 then
-            hotPotatoLabel.Visible = false
+            if activePotatoes[holderName] then
+                activePotatoes[holderName] = nil
+            else
+                activePotatoes = {} -- fallback to clear all
+            end
         else
+            activePotatoes[holderName] = {timer = timer, lastUpdate = tick()}
+        end
+
+        local strs = {}
+        for k, v in pairs(activePotatoes) do
+            table.insert(strs, k .. " (" .. tostring(v.timer) .. "s)")
+        end
+
+        if #strs > 0 then
             hotPotatoLabel.Visible = true
-            hotPotatoLabel.Text = "Hot Potato: " .. tostring(holderName) .. " (" .. tostring(timer) .. "s)"
+            hotPotatoLabel.Text = "Hot Potato: " .. table.concat(strs, " | ")
+        else
+            hotPotatoLabel.Visible = false
+            hotPotatoLabel.Text = ""
         end
     end)
 end

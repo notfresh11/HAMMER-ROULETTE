@@ -429,7 +429,7 @@ local function gameLoop()
                         local ServerStorage = game:GetService("ServerStorage")
                         local beachBallFolder = ServerStorage:FindFirstChild("BeachBall")
                         if beachBallFolder then
-                            local ballTool = beachBallFolder:FindFirstChild("Tool")
+                            local ballTool = beachBallFolder:FindFirstChild("BeachBall") or beachBallFolder:FindFirstChild("Tool")
                             if ballTool then
                                 for _, player in ipairs(activePlayers) do
                                     if not table.find(chosenPlayers, player) then

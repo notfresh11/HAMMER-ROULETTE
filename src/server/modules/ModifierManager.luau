@@ -128,9 +128,9 @@ knockbackEvent.OnServerEvent:Connect(function(player)
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
-    -- Găsim ținta în fața jucătorului (maxim 8 stud-uri)
-    local hitDist = 8
-    local pushForce = 80 -- destul de mult încât să fie frustrant
+    -- Găsim ținta în fața jucătorului (maxim 12 stud-uri)
+    local hitDist = 12
+    local pushForce = 90 -- destul de mult încât să fie frustrant
 
     local closestTarget = nil
     local closestDist = hitDist
@@ -145,7 +145,7 @@ knockbackEvent.OnServerEvent:Connect(function(player)
                     local dirToTarget = (otherRoot.Position - root.Position).Unit
                     local forwardDir = root.CFrame.LookVector
                     local dotProduct = forwardDir:Dot(dirToTarget)
-                    if dotProduct > 0.5 then -- Aprox 60 grade
+                    if dotProduct > 0.3 or dist <= 4 then -- Mai permisiv cu unghiul, iar dacă sunt super aproape nu mai contează unghiul așa mult
                         if dist < closestDist then
                             closestDist = dist
                             closestTarget = otherRoot
@@ -399,8 +399,11 @@ ModifierManager.Modifiers = {
         Name = "Panic at the Disco!",
         Apply = function()
             local discoConn
+            local lastChange = 0
             discoConn = RunService.Heartbeat:Connect(function()
-                if math.random() < 0.1 then -- limit frequency
+                local now = tick()
+                if now - lastChange > 1 then -- change color only once per second
+                    lastChange = now
                     local map = MapManager.getCurrentMap()
                     if map then
                         local parts = {}
@@ -410,10 +413,13 @@ ModifierManager.Modifiers = {
                             end
                         end
                         if #parts > 0 then
-                            local part = parts[math.random(1, #parts)]
-                            originalMapProperties[part] = originalMapProperties[part] or {}
-                            originalMapProperties[part].Color = originalMapProperties[part].Color or part.Color
-                            part.Color = Color3.new(math.random(), math.random(), math.random())
+                            -- Change up to 3 random parts per second
+                            for _ = 1, math.min(3, #parts) do
+                                local part = parts[math.random(1, #parts)]
+                                originalMapProperties[part] = originalMapProperties[part] or {}
+                                originalMapProperties[part].Color = originalMapProperties[part].Color or part.Color
+                                part.Color = Color3.new(math.random(), math.random(), math.random())
+                            end
                         end
                     end
                 end
@@ -481,9 +487,11 @@ ModifierManager.Modifiers = {
 
 local Exclusions = {
     {"Grow a Player!", "The Player isnt Growing..."},
-    {"Double Trouble !", "Triple Trouble !"},
+    {"Streamsnipe", "SuddenDeath", "Hot Potato"},
+    {"Double Trouble !", "Triple Trouble !", "Streamsnipe", "SuddenDeath"}, -- Hot Potato POATE pica cu Double/Triple Trouble, dar nu Streamsnipe sau SuddenDeath
+    {"Ghost Party", "Shadow Assasin"}, -- I cant see! poate pica cu ele, deci nu e in acest grup!
     {"Invisible platform", "Panic at the Disco!"},
-    {"Ghost Party", "Shadow Assasin", "I cant see !"}
+    {"AdminAbuse", "Nothing Special"}
 }
 
 function ModifierManager.GetActiveModifiers()
@@ -491,13 +499,13 @@ function ModifierManager.GetActiveModifiers()
 end
 
 function ModifierManager.IsModifierActive(name)
-    if name == "AdminAbuse" then
-        return table.find(activeModifiers, name) ~= nil
+    if table.find(activeModifiers, name) then return true end
+    if table.find(activeModifiers, "AdminAbuse") then
+        if table.find(adminAbuseApplied, name) then
+            return true
+        end
     end
-    if table.find(activeModifiers, "AdminAbuse") and name ~= "Nothing Special" then
-        return true
-    end
-    return table.find(activeModifiers, name) ~= nil
+    return false
 end
 
 function ModifierManager.ApplyOutlineToCharacter(character, enable, isMaceUser)
@@ -691,24 +699,13 @@ function ModifierManager.PickAndAddModifier(activePlayerCount)
             canAdd = false
         end
 
-        -- Check exclusions
-        if canAdd then
-            for _, group in ipairs(Exclusions) do
-                if table.find(group, modName) then
-                    for _, activeMod in ipairs(activeModifiers) do
-                        if table.find(group, activeMod) then
-                            canAdd = false
-                            break
-                        end
-                    end
-                end
-                if not canAdd then break end
-            end
-        end
+        -- Instead of failing `canAdd = false`, we keep it true and handle replacement later
+        -- but for picking from `available`, we consider everything available EXCEPT exactly the ones we already have.
 
         -- Check player count constraints
         if canAdd and modName == "Double Trouble !" and activePlayerCount < 3 then canAdd = false end
         if canAdd and modName == "Triple Trouble !" and activePlayerCount < 4 then canAdd = false end
+        if canAdd and modName == "SuddenDeath" and activePlayerCount < 3 then canAdd = false end
 
         if canAdd then
             table.insert(available, modName)
@@ -736,8 +733,43 @@ function ModifierManager.PickAndAddModifier(activePlayerCount)
 
             activeModifiers = {chosen}
             adminAbuseApplied = {}
-            for mName, mDef in pairs(ModifierManager.Modifiers) do
+
+            -- Shuffle modifier list to give fair random chances
+            local keys = {}
+            for mName in pairs(ModifierManager.Modifiers) do
                 if mName ~= "AdminAbuse" and mName ~= "Nothing Special" then
+                    table.insert(keys, mName)
+                end
+            end
+
+            for i = #keys, 2, -1 do
+                local j = math.random(i)
+                keys[i], keys[j] = keys[j], keys[i]
+            end
+
+            for _, mName in ipairs(keys) do
+                local mDef = ModifierManager.Modifiers[mName]
+
+                -- Check if it can be added without violating exclusions
+                local canAdd = true
+                for _, group in ipairs(Exclusions) do
+                    if table.find(group, mName) then
+                        for _, appliedMod in ipairs(adminAbuseApplied) do
+                            if table.find(group, appliedMod) then
+                                canAdd = false
+                                break
+                            end
+                        end
+                    end
+                    if not canAdd then break end
+                end
+
+                -- Check player count constraints
+                if canAdd and mName == "Double Trouble !" and activePlayerCount < 3 then canAdd = false end
+                if canAdd and mName == "Triple Trouble !" and activePlayerCount < 4 then canAdd = false end
+                if canAdd and mName == "SuddenDeath" and activePlayerCount < 3 then canAdd = false end
+
+                if canAdd then
                     table.insert(adminAbuseApplied, mName)
                     if mDef.Apply then mDef.Apply() end
                 end
@@ -747,6 +779,31 @@ function ModifierManager.PickAndAddModifier(activePlayerCount)
             return chosen
         end
 
+        -- Handle Exclusions for `chosen` (replace any conflicting active modifiers)
+        local newActiveModifiers = {}
+        local conflictingModsToRemove = {}
+
+        for _, activeMod in ipairs(activeModifiers) do
+            local conflict = false
+            for _, group in ipairs(Exclusions) do
+                if table.find(group, chosen) and table.find(group, activeMod) then
+                    conflict = true
+                    break
+                end
+            end
+            if conflict then
+                table.insert(conflictingModsToRemove, activeMod)
+            else
+                table.insert(newActiveModifiers, activeMod)
+            end
+        end
+
+        for _, modName in ipairs(conflictingModsToRemove) do
+            local oldMod = ModifierManager.Modifiers[modName]
+            if oldMod and oldMod.Remove then oldMod.Remove() end
+        end
+
+        activeModifiers = newActiveModifiers
         table.insert(activeModifiers, chosen)
 
         local mod = ModifierManager.Modifiers[chosen]
@@ -804,6 +861,12 @@ function ModifierManager.UpdateDynamicModifiers(activePlayers, maceUsers)
                 local root = player.Character:FindFirstChild("HumanoidRootPart")
                 local hum = player.Character:FindFirstChild("Humanoid")
                 if root and hum and hum.Health > 0 then
+                    -- Oprește scriptul nativ de Health ca să nu se regenereze automat în The Floor is Lava (ori permanent pe parcursul meciului dacă The Floor is Lava a fost vreodată activ)
+                    local healthScript = player.Character:FindFirstChild("Health")
+                    if healthScript and healthScript:IsA("Script") then
+                        healthScript.Disabled = true
+                    end
+
                     -- Check if on floor and moving
                     local isMoving = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z).Magnitude > 1
                     local isOnFloor = hum.FloorMaterial ~= Enum.Material.Air
@@ -811,7 +874,7 @@ function ModifierManager.UpdateDynamicModifiers(activePlayers, maceUsers)
                         local lastTick = lavaDamageTicks[player.UserId] or 0
                         if now - lastTick >= 1 then
                             lavaDamageTicks[player.UserId] = now
-                            hum:TakeDamage(1)
+                            hum:TakeDamage(5)
                         end
                     end
                 end
