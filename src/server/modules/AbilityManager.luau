@@ -65,6 +65,39 @@ local function syncAbilities(player)
     end
 end
 
+local originalAbilities = {}
+
+function AbilityManager.EquipRandomAbility(player)
+    local data = DataManager.GetData(player)
+    if not data then return end
+
+    if originalAbilities[player.UserId] == nil then
+        originalAbilities[player.UserId] = data.EquippedAbility or ""
+    end
+
+    local owned = {}
+    for abName, isOwned in pairs(data.OwnedAbilities) do
+        if isOwned then table.insert(owned, abName) end
+    end
+
+    if #owned > 0 then
+        data.EquippedAbility = owned[math.random(1, #owned)]
+        syncAbilities(player)
+    end
+end
+
+function AbilityManager.RestoreOriginalAbility(player)
+    local data = DataManager.GetData(player)
+    if not data then return end
+
+    if originalAbilities[player.UserId] ~= nil then
+        local orig = originalAbilities[player.UserId]
+        data.EquippedAbility = (orig == "" and nil or orig)
+        originalAbilities[player.UserId] = nil
+        syncAbilities(player)
+    end
+end
+
 -- Handling UI Requests
 abilityRequestEvent.OnServerEvent:Connect(function(player, action, abilityName)
     local data = DataManager.GetData(player)

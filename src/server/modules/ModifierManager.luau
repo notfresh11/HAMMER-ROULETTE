@@ -8,6 +8,8 @@ local TweenService = game:GetService("TweenService")
 local MapManager = require(script.Parent.MapManager)
 
 local activeModifiers = {}
+local savedModifiers = nil
+local adminAbuseApplied = {}
 local modifierConnections = {}
 local originalMapProperties = {}
 local originalLighting = {}
@@ -25,6 +27,158 @@ if not clientModifierEvent then
     clientModifierEvent.Name = "ClientModifierEvent"
     clientModifierEvent.Parent = ReplicatedStorage
 end
+
+local knockbackEvent = ReplicatedStorage:FindFirstChild("KnockbackClickEvent")
+if not knockbackEvent then
+    knockbackEvent = Instance.new("RemoteEvent")
+    knockbackEvent.Name = "KnockbackClickEvent"
+    knockbackEvent.Parent = ReplicatedStorage
+end
+
+local beachBallThrowEvent = ReplicatedStorage:FindFirstChild("BeachBallThrowEvent")
+if not beachBallThrowEvent then
+    beachBallThrowEvent = Instance.new("RemoteEvent")
+    beachBallThrowEvent.Name = "BeachBallThrowEvent"
+    beachBallThrowEvent.Parent = ReplicatedStorage
+end
+
+local hotPotatoTimerEvent = ReplicatedStorage:FindFirstChild("HotPotatoTimerEvent")
+if not hotPotatoTimerEvent then
+    hotPotatoTimerEvent = Instance.new("RemoteEvent")
+    hotPotatoTimerEvent.Name = "HotPotatoTimerEvent"
+    hotPotatoTimerEvent.Parent = ReplicatedStorage
+end
+
+local passEvent = ReplicatedStorage:FindFirstChild("HotPotatoPassEvent")
+if not passEvent then
+    passEvent = Instance.new("RemoteEvent")
+    passEvent.Name = "HotPotatoPassEvent"
+    passEvent.Parent = ReplicatedStorage
+end
+
+beachBallThrowEvent.OnServerEvent:Connect(function(player, cursorHitPosition)
+    if not ModifierManager.IsModifierActive("Beach Episode") then return end
+    if typeof(cursorHitPosition) ~= "Vector3" then return end
+
+    local char = player.Character
+    if not char then return end
+
+    local tool = char:FindFirstChild("BeachBall")
+    if not tool then return end
+
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    -- Destroy tool right away
+    tool:Destroy()
+
+    local dirToHit = (cursorHitPosition - root.Position).Unit
+    local forwardDir = root.CFrame.LookVector
+    -- Jucătorul trebuie să stea cu fața la punctul unde vrea să arunce
+    if forwardDir:Dot(dirToHit) < 0.5 then
+        return -- nu e orientat cu fața spre cursor
+    end
+
+    -- Spawn projectile visually (optional, we'll just check hits on a ray or distance)
+    local hitDist = 50 -- range of ball throw
+    local pushForce = 120
+
+    local closestTarget = nil
+    local closestDist = hitDist
+
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character then
+            local otherRoot = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if otherRoot then
+                local dist = (otherRoot.Position - root.Position).Magnitude
+                if dist <= hitDist then
+                    local dirToTarget = (otherRoot.Position - root.Position).Unit
+                    local dotToTarget = dirToHit:Dot(dirToTarget)
+                    -- Trebuie să fie pe traiectoria mingii (aproximativ)
+                    if dotToTarget > 0.9 then
+                        if dist < closestDist then
+                            closestDist = dist
+                            closestTarget = otherRoot
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if closestTarget then
+        local flatDir = Vector3.new(dirToHit.X, 0, dirToHit.Z).Unit
+        if flatDir.Magnitude ~= flatDir.Magnitude then flatDir = Vector3.new(1,0,0) end
+
+        closestTarget.AssemblyLinearVelocity = flatDir * pushForce + Vector3.new(0, 50, 0)
+    end
+end)
+
+local lastKnockbacks = {}
+knockbackEvent.OnServerEvent:Connect(function(player)
+    if not ModifierManager.IsModifierActive("KnockBack") then return end
+
+    local now = tick()
+    local lastTime = lastKnockbacks[player.UserId] or 0
+    if now - lastTime < 1 then return end
+    lastKnockbacks[player.UserId] = now
+
+    local char = player.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    -- Găsim ținta în fața jucătorului (maxim 8 stud-uri)
+    local hitDist = 8
+    local pushForce = 80 -- destul de mult încât să fie frustrant
+
+    local closestTarget = nil
+    local closestDist = hitDist
+
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character then
+            local otherRoot = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if otherRoot then
+                local dist = (otherRoot.Position - root.Position).Magnitude
+                if dist <= hitDist then
+                    -- Verificăm dacă se află în unghiul vizual frontal
+                    local dirToTarget = (otherRoot.Position - root.Position).Unit
+                    local forwardDir = root.CFrame.LookVector
+                    local dotProduct = forwardDir:Dot(dirToTarget)
+                    if dotProduct > 0.5 then -- Aprox 60 grade
+                        if dist < closestDist then
+                            closestDist = dist
+                            closestTarget = otherRoot
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if closestTarget then
+        -- Play an animation if we want (optional, we can just apply push)
+        -- Animatia standard de punch:
+        local pushAnimId = "rbxassetid://104708388"
+        local anim = Instance.new("Animation")
+        anim.AnimationId = pushAnimId
+        local hum = char:FindFirstChild("Humanoid")
+        if hum then
+            local animator = hum:FindFirstChildOfClass("Animator")
+            if animator then
+                animator:LoadAnimation(anim):Play()
+            end
+        end
+
+        local pushDir = root.CFrame.LookVector
+        -- Aplicăm assembly linear velocity pe X și Z, și puțin pe Y
+        local flatDir = Vector3.new(pushDir.X, 0, pushDir.Z).Unit
+        if flatDir.Magnitude ~= flatDir.Magnitude then flatDir = Vector3.new(1,0,0) end
+
+        -- Override current velocity completely for a hard push
+        closestTarget.AssemblyLinearVelocity = flatDir * pushForce + Vector3.new(0, 30, 0)
+    end
+end)
 
 -- Define all modifiers
 ModifierManager.Modifiers = {
@@ -117,9 +271,9 @@ ModifierManager.Modifiers = {
             end
             for _, player in ipairs(Players:GetPlayers()) do
                 if player.Character then
-                    for _, part in ipairs(player.Character:GetChildren()) do
+                    for _, part in ipairs(player.Character:GetDescendants()) do
                         if part:IsA("BasePart") then
-                            part.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.5, 1, 1)
+                            part.CustomPhysicalProperties = nil
                         end
                     end
                 end
@@ -277,6 +431,51 @@ ModifierManager.Modifiers = {
     ["Shockwave"] = {
         Name = "Shockwave",
         Apply = function() end, Remove = function() end -- Logic in MaceMechanic
+    },
+    ["Streamsnipe"] = {
+        Name = "Streamsnipe",
+        IsRoundModifier = true,
+        Apply = function() end, Remove = function() end
+    },
+    ["SuddenDeath"] = {
+        Name = "SuddenDeath",
+        IsRoundModifier = true,
+        Apply = function() end, Remove = function() end
+    },
+    ["KnockBack"] = {
+        Name = "KnockBack",
+        Apply = function() end, Remove = function() end
+    },
+    ["The Floor is Lava"] = {
+        Name = "The Floor is Lava",
+        Apply = function() end, Remove = function() end
+    },
+    ["Beach Episode"] = {
+        Name = "Beach Episode",
+        Apply = function() end, Remove = function() end
+    },
+    ["Nothing Special"] = {
+        Name = "Nothing Special",
+        IsRoundModifier = true,
+        Apply = function() end, Remove = function() end
+    },
+    ["Random Strategy"] = {
+        Name = "Random Strategy",
+        Apply = function() end, Remove = function() end
+    },
+    ["AdminAbuse"] = {
+        Name = "AdminAbuse",
+        IsRoundModifier = true,
+        Apply = function() end, Remove = function() end
+    },
+    ["Impostor"] = {
+        Name = "Impostor",
+        Apply = function() end, Remove = function() end
+    },
+    ["Hot Potato"] = {
+        Name = "Hot Potato",
+        IsRoundModifier = true,
+        Apply = function() end, Remove = function() end
     }
 }
 
@@ -292,6 +491,12 @@ function ModifierManager.GetActiveModifiers()
 end
 
 function ModifierManager.IsModifierActive(name)
+    if name == "AdminAbuse" then
+        return table.find(activeModifiers, name) ~= nil
+    end
+    if table.find(activeModifiers, "AdminAbuse") and name ~= "Nothing Special" then
+        return true
+    end
     return table.find(activeModifiers, name) ~= nil
 end
 
@@ -364,12 +569,23 @@ function ModifierManager.ReapplyPlayerStates(player)
         ModifierManager.ApplyGhostToCharacter(char, false, false)
     end
 
-    -- Check I cant see !
+    -- Outline Logic
+    local needsOutline = false
+    local isRedOutline = false
+    local isImpostor = ModifierManager.IsModifierActive("Impostor")
+
     if ModifierManager.IsModifierActive("I cant see !") then
-        ModifierManager.ApplyOutlineToCharacter(char, true, false)
+        needsOutline = true
     end
 
-    -- Check Super Speed
+    if isImpostor then
+        needsOutline = true
+        isRedOutline = true
+    end
+
+    ModifierManager.ApplyOutlineToCharacter(char, needsOutline, isRedOutline)
+
+    -- Check Super Speed & Jump Power
     local hum = char:FindFirstChild("Humanoid")
     if hum then
         if ModifierManager.IsModifierActive("Super Speed") then
@@ -379,10 +595,26 @@ function ModifierManager.ReapplyPlayerStates(player)
             hum.WalkSpeed = 16
             char:SetAttribute("MaxSpeedAllowed", 16)
         end
+
+        if isImpostor then
+            hum.UseJumpPower = false
+            hum.JumpHeight = 40
+        else
+            hum.UseJumpPower = false
+            hum.JumpHeight = 7.2
+        end
     end
 end
 
 function ModifierManager.ClearAllModifiers()
+    if #adminAbuseApplied > 0 then
+        for _, modName in ipairs(adminAbuseApplied) do
+            local mod = ModifierManager.Modifiers[modName]
+            if mod and mod.Remove then mod.Remove() end
+        end
+        adminAbuseApplied = {}
+    end
+
     for _, modName in ipairs(activeModifiers) do
         local mod = ModifierManager.Modifiers[modName]
         if mod and mod.Remove then
@@ -396,8 +628,58 @@ function ModifierManager.ClearAllModifiers()
     table.clear(modifierConnections)
 
     activeModifiers = {}
+    savedModifiers = nil
+    adminAbuseApplied = {}
     table.clear(originalMapProperties)
     updateModifiersUIEvent:FireAllClients({})
+end
+
+function ModifierManager.ClearRoundModifiers()
+    -- Restore original modifiers if a special override was active
+    if savedModifiers then
+        if #adminAbuseApplied > 0 then
+            -- Remove all forced AdminAbuse modifiers
+            for _, modName in ipairs(adminAbuseApplied) do
+                local mod = ModifierManager.Modifiers[modName]
+                if mod and mod.Remove then mod.Remove() end
+            end
+            adminAbuseApplied = {}
+        end
+
+        -- Remove the override modifier (Nothing Special / AdminAbuse)
+        for _, modName in ipairs(activeModifiers) do
+            local mod = ModifierManager.Modifiers[modName]
+            if mod and mod.IsRoundModifier and mod.Remove then
+                mod.Remove()
+            end
+        end
+
+        -- Re-apply saved modifiers
+        activeModifiers = {}
+        for _, modName in ipairs(savedModifiers) do
+            table.insert(activeModifiers, modName)
+            local mod = ModifierManager.Modifiers[modName]
+            if mod and mod.Apply then
+                mod.Apply()
+            end
+        end
+        savedModifiers = nil
+    else
+        local newActiveModifiers = {}
+        for _, modName in ipairs(activeModifiers) do
+            local mod = ModifierManager.Modifiers[modName]
+            if mod and mod.IsRoundModifier then
+                if mod.Remove then
+                    mod.Remove()
+                end
+            else
+                table.insert(newActiveModifiers, modName)
+            end
+        end
+        activeModifiers = newActiveModifiers
+    end
+
+    updateModifiersUIEvent:FireAllClients(activeModifiers)
 end
 
 function ModifierManager.PickAndAddModifier(activePlayerCount)
@@ -435,6 +717,36 @@ function ModifierManager.PickAndAddModifier(activePlayerCount)
 
     if #available > 0 then
         local chosen = available[math.random(1, #available)]
+
+        if chosen == "Nothing Special" then
+            savedModifiers = {}
+            for _, m in ipairs(activeModifiers) do table.insert(savedModifiers, m) end
+
+            -- Remove current ones
+            for _, m in ipairs(activeModifiers) do
+                local oldMod = ModifierManager.Modifiers[m]
+                if oldMod and oldMod.Remove then oldMod.Remove() end
+            end
+            activeModifiers = {chosen}
+            updateModifiersUIEvent:FireAllClients(activeModifiers)
+            return chosen
+        elseif chosen == "AdminAbuse" then
+            savedModifiers = {}
+            for _, m in ipairs(activeModifiers) do table.insert(savedModifiers, m) end
+
+            activeModifiers = {chosen}
+            adminAbuseApplied = {}
+            for mName, mDef in pairs(ModifierManager.Modifiers) do
+                if mName ~= "AdminAbuse" and mName ~= "Nothing Special" then
+                    table.insert(adminAbuseApplied, mName)
+                    if mDef.Apply then mDef.Apply() end
+                end
+            end
+
+            updateModifiersUIEvent:FireAllClients(activeModifiers)
+            return chosen
+        end
+
         table.insert(activeModifiers, chosen)
 
         local mod = ModifierManager.Modifiers[chosen]
@@ -448,9 +760,14 @@ function ModifierManager.PickAndAddModifier(activePlayerCount)
     return nil
 end
 
+local lavaDamageTicks = {}
+
 function ModifierManager.UpdateDynamicModifiers(activePlayers, maceUsers)
     local growActive = ModifierManager.IsModifierActive("Grow a Player!")
     local shrinkActive = ModifierManager.IsModifierActive("The Player isnt Growing...")
+    local floorIsLava = ModifierManager.IsModifierActive("The Floor is Lava")
+
+    local now = tick()
 
     if growActive or shrinkActive then
         for _, player in ipairs(activePlayers) do
@@ -474,6 +791,27 @@ function ModifierManager.UpdateDynamicModifiers(activePlayers, maceUsers)
                                 end
                                 val.Value = newVal
                             end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if floorIsLava then
+        for _, player in ipairs(activePlayers) do
+            if player.Character then
+                local root = player.Character:FindFirstChild("HumanoidRootPart")
+                local hum = player.Character:FindFirstChild("Humanoid")
+                if root and hum and hum.Health > 0 then
+                    -- Check if on floor and moving
+                    local isMoving = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z).Magnitude > 1
+                    local isOnFloor = hum.FloorMaterial ~= Enum.Material.Air
+                    if isMoving and isOnFloor then
+                        local lastTick = lavaDamageTicks[player.UserId] or 0
+                        if now - lastTick >= 1 then
+                            lavaDamageTicks[player.UserId] = now
+                            hum:TakeDamage(1)
                         end
                     end
                 end

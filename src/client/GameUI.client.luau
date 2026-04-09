@@ -25,14 +25,32 @@ textLabel.Text = ""
 textLabel.Visible = false
 textLabel.Parent = screenGui
 
+local hotPotatoLabel = Instance.new("TextLabel")
+hotPotatoLabel.Name = "HotPotatoText"
+hotPotatoLabel.AnchorPoint = Vector2.new(0.5, 0)
+hotPotatoLabel.Size = UDim2.new(1, 0, 0.1, 0)
+hotPotatoLabel.Position = UDim2.new(0.5, 0, 0.1, 0) -- Top center
+hotPotatoLabel.BackgroundTransparency = 1
+hotPotatoLabel.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json")
+hotPotatoLabel.TextScaled = true
+hotPotatoLabel.TextColor3 = Color3.new(1, 0.3, 0)
+hotPotatoLabel.TextStrokeTransparency = 0
+hotPotatoLabel.Text = ""
+hotPotatoLabel.Visible = false
+hotPotatoLabel.Parent = screenGui
+
 local modifiersLabel = Instance.new("TextLabel")
 modifiersLabel.Name = "ModifiersText"
 modifiersLabel.AnchorPoint = Vector2.new(0.5, 0)
-modifiersLabel.Size = UDim2.new(1, 0, 0.05, 0)
+modifiersLabel.Size = UDim2.new(0.9, 0, 0, 0)
 modifiersLabel.Position = UDim2.new(0.5, 0, 0.55, 0) -- Right below CenterText
 modifiersLabel.BackgroundTransparency = 1
 modifiersLabel.FontFace = Font.new("rbxasset://fonts/families/FredokaOne.json")
-modifiersLabel.TextScaled = true
+modifiersLabel.TextScaled = false
+modifiersLabel.TextSize = 35
+modifiersLabel.TextWrapped = true
+modifiersLabel.RichText = true
+modifiersLabel.AutomaticSize = Enum.AutomaticSize.Y
 modifiersLabel.TextColor3 = Color3.new(1, 0.8, 0) -- Yellowish for modifiers
 modifiersLabel.TextStrokeTransparency = 0
 modifiersLabel.Text = ""
@@ -1004,6 +1022,18 @@ if clientModifierEvent then
     end)
 end
 
+local updateTimerEvent = ReplicatedStorage:WaitForChild("HotPotatoTimerEvent", 10)
+if updateTimerEvent then
+    updateTimerEvent.OnClientEvent:Connect(function(timer, holderName)
+        if timer < 0 then
+            hotPotatoLabel.Visible = false
+        else
+            hotPotatoLabel.Visible = true
+            hotPotatoLabel.Text = "Hot Potato: " .. tostring(holderName) .. " (" .. tostring(timer) .. "s)"
+        end
+    end)
+end
+
 local shockwaveEvent = ReplicatedStorage:WaitForChild("ShockwaveVfxEvent", 10)
 if shockwaveEvent then
     shockwaveEvent.OnClientEvent:Connect(function(blastPos)
@@ -1014,7 +1044,8 @@ if shockwaveEvent then
         local shock = Instance.new("Part")
         shock.Shape = Enum.PartType.Cylinder
         shock.Size = Vector3.new(0.5, 5, 5)
-        shock.CFrame = CFrame.new(blastPos) * CFrame.Angles(0, 0, math.rad(90))
+        -- Ridicăm blastPos cu 1.5 studs (aproximativ nivelul picioarelor/taliei) ca să nu fie în pământ
+        shock.CFrame = CFrame.new(blastPos + Vector3.new(0, 1.5, 0)) * CFrame.Angles(0, 0, math.rad(90))
         shock.Color = Color3.new(1, 1, 1)
         shock.Material = Enum.Material.Neon
         shock.Transparency = 0.2
