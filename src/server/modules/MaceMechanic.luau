@@ -337,13 +337,22 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
         end
 
         -- 3. Detect Landing on the floor (Any surface)
-        if hasStartedFalling and humanoid.Health > 0 and rootPart then
+        -- Dacă jucătorul e în aer, actualizăm înălțimea maximă
+        if (humanoid.FloorMaterial == Enum.Material.Air) then
+            if rootPart and rootPart.Position.Y > maxJumpY then
+                maxJumpY = rootPart.Position.Y
+            end
+        end
+
+        -- Am eliminat complet hasStartedFalling. Verificăm doar dacă e viu și are rootPart
+        if humanoid.Health > 0 and rootPart then
             -- Position-based grace period: Jucătorul trebuie să fi coborât cel puțin 0.5 studs de la înălțimea maximă atinsă
             -- SAU să fi trecut măcar 0.25 secunde de la momentul săriturii pentru a ieși din frame-ul inițial de la sol
             local timeSinceJump = tick() - fallStartTick
             local fallDistance = maxJumpY - rootPart.Position.Y
 
-            if (timeSinceJump > 0.25) or (fallDistance > 0.5) then
+            -- Aplicăm regula doar dacă chiar a coborât (ca să nu moară stând pe loc înainte să sară)
+            if (fallDistance > 0.5) or (timeSinceJump > 0.25 and fallDistance > 0.1) then
                 -- Verificam daca jucatorul se afla strict intr-o miscare de coborare fizica reala sau e oprit
                 if rootPart.AssemblyLinearVelocity.Y <= 0.1 then
                     local isOnGround = false
@@ -392,10 +401,6 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                 end
                 end
             end
-        end
-
-        if not hasStartedFalling and not pendingLandingEnd then
-            -- They haven't jumped yet, but we allow auto-hits if they walk into someone
         end
 
         if now - lastHitTick < AUTO_HIT_COOLDOWN then return end
