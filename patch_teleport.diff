@@ -1,0 +1,27 @@
+<<<<<<< SEARCH
+                -- Ensure hammer is visible at round start
+                if type(currentHammer) == "table" then
+                    for _, h in ipairs(currentHammer) do setHammerVisibility(h, true) end
+                elseif currentHammer then
+                    setHammerVisibility(currentHammer, true)
+                end
+
+                Matchmaking.teleportPlayersToSpawns(activePlayers, currentMap)
+
+                -- Block player movement while roulette spins
+=======
+                -- Ensure hammer is visible at round start
+                if type(currentHammer) == "table" then
+                    for _, h in ipairs(currentHammer) do setHammerVisibility(h, true) end
+                elseif currentHammer then
+                    setHammerVisibility(currentHammer, true)
+                end
+
+                -- Only teleport players to spawns on the FIRST round.
+                -- Otherwise they stay in the arena where they are.
+                if isTeleportFirstRound then
+                    Matchmaking.teleportPlayersToSpawns(activePlayers, currentMap)
+                end
+
+                -- Block player movement while roulette spins
+>>>>>>> REPLACE

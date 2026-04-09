@@ -1019,3 +1019,15 @@ if shockwaveEvent then
         shock.Material = Enum.Material.Neon
         shock.Transparency = 0.2
         shock.Anchored = true
+        shock.CanCollide = false
+        shock.CanQuery = false
+        shock.Parent = Workspace
+
+        local tween = TweenService:Create(shock, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = Vector3.new(0.5, 30, 30),
+            Transparency = 1
+        })
+        tween:Play()
+        Debris:AddItem(shock, 0.5)
+    end)
+end

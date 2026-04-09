@@ -1,0 +1,17 @@
+<<<<<<< SEARCH
+                -- Block player movement while roulette spins
+                setPlayersAnchored(activePlayers, true)
+
+                task.wait(1) -- small delay for physics/camera to settle
+
+                local chosenPlayers = Roulette.selectMaceBearers(activePlayers, numMaces)
+=======
+                -- Block player movement while roulette spins
+                setPlayersAnchored(activePlayers, true)
+
+                task.wait(1) -- small delay for physics/camera to settle
+
+                isTeleportFirstRound = false
+
+                local chosenPlayers = Roulette.selectMaceBearers(activePlayers, numMaces)
+>>>>>>> REPLACE

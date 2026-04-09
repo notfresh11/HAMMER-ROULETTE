@@ -1,0 +1,22 @@
+<<<<<<< SEARCH
+            -- Bucla de Runde (cât timp sunt cel puțin 2 supraviețuitori în meci)
+            local isFirstRound = true
+            while #activePlayers > 1 do
+                print("MainLoop: Începem o NOUĂ RUNDĂ cu " .. #activePlayers .. " supraviețuitori.")
+
+                if not isFirstRound then
+                    ModifierManager.PickAndAddModifier(#activePlayers)
+                end
+                isFirstRound = false
+=======
+            -- Bucla de Runde (cât timp sunt cel puțin 2 supraviețuitori în meci)
+            local isFirstRound = true
+            local isTeleportFirstRound = true
+            while #activePlayers > 1 do
+                print("MainLoop: Începem o NOUĂ RUNDĂ cu " .. #activePlayers .. " supraviețuitori.")
+
+                if not isFirstRound then
+                    ModifierManager.PickAndAddModifier(#activePlayers)
+                end
+                isFirstRound = false
+>>>>>>> REPLACE
