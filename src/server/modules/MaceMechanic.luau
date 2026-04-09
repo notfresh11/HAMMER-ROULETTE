@@ -582,9 +582,17 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
 
                         -- SHOCKWAVE MODIFIER LOGIC
                         if ModifierManager.IsModifierActive("Shockwave") then
+                            -- Ensure the RemoteEvent exists
+                            local shockwaveEvent = ReplicatedStorage:FindFirstChild("ShockwaveVfxEvent")
+                            if not shockwaveEvent then
+                                shockwaveEvent = Instance.new("RemoteEvent")
+                                shockwaveEvent.Name = "ShockwaveVfxEvent"
+                                shockwaveEvent.Parent = ReplicatedStorage
+                            end
                             local targetRoot = hitChar:FindFirstChild("HumanoidRootPart")
                             if targetRoot then
                                 local blastPos = targetRoot.Position
+                                shockwaveEvent:FireAllClients(blastPos)
                                 for _, otherPlayer in ipairs(Players:GetPlayers()) do
                                     if otherPlayer ~= player and otherPlayer.Character then
                                         local otherRoot = otherPlayer.Character:FindFirstChild("HumanoidRootPart")

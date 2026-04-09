@@ -53,7 +53,7 @@ ModifierManager.Modifiers = {
     ["Shadow Assasin"] = {
         Name = "Shadow Assasin",
         Apply = function()
-            -- Logic handled in MaceMechanic / MainGameLoop for the specific player
+            -- Shadow Assassin is handled in MaceMechanic, it makes the Mace User transparent to others but they see an outline of themselves
         end,
         Remove = function()
         end
@@ -63,14 +63,16 @@ ModifierManager.Modifiers = {
         Apply = function()
             for _, player in ipairs(Players:GetPlayers()) do
                 if player.Character then
-                    ModifierManager.ApplyGhostToCharacter(player.Character, true)
+                    ModifierManager.ApplyGhostToCharacter(player.Character, true, false)
+                    ModifierManager.ApplyOutlineToCharacter(player.Character, true, false)
                 end
             end
         end,
         Remove = function()
             for _, player in ipairs(Players:GetPlayers()) do
                 if player.Character then
-                    ModifierManager.ApplyGhostToCharacter(player.Character, false)
+                    ModifierManager.ApplyGhostToCharacter(player.Character, false, false)
+                    ModifierManager.ApplyOutlineToCharacter(player.Character, false, false)
                 end
             end
         end
@@ -93,6 +95,15 @@ ModifierManager.Modifiers = {
                     part.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.01, 0, 100, 1)
                 end
             end
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player.Character then
+                    for _, part in ipairs(player.Character:GetChildren()) do
+                        if part:IsA("BasePart") then
+                            part.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.01, 0, 100, 1)
+                        end
+                    end
+                end
+            end
         end,
         Remove = function()
             for part, props in pairs(originalMapProperties) do
@@ -101,6 +112,15 @@ ModifierManager.Modifiers = {
                         part.CustomPhysicalProperties = nil
                     else
                         part.CustomPhysicalProperties = props.CustomPhysicalProperties
+                    end
+                end
+            end
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player.Character then
+                    for _, part in ipairs(player.Character:GetChildren()) do
+                        if part:IsA("BasePart") then
+                            part.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.5, 1, 1)
+                        end
                     end
                 end
             end
@@ -157,9 +177,6 @@ ModifierManager.Modifiers = {
             originalLighting.FogColor = Lighting.FogColor
             originalLighting.FogEnd = Lighting.FogEnd
             originalLighting.FogStart = Lighting.FogStart
-            Lighting.FogColor = Color3.new(0, 0, 0)
-            Lighting.FogEnd = 30
-            Lighting.FogStart = 0
             clientModifierEvent:FireAllClients("Fog", {Color = Color3.new(0,0,0), End = 30, Start = 0})
 
             -- Apply outline to everyone
