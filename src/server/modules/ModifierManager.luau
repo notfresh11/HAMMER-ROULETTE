@@ -699,8 +699,25 @@ function ModifierManager.PickAndAddModifier(activePlayerCount)
             canAdd = false
         end
 
-        -- Instead of failing `canAdd = false`, we keep it true and handle replacement later
-        -- but for picking from `available`, we consider everything available EXCEPT exactly the ones we already have.
+        if canAdd then
+            for _, group in ipairs(Exclusions) do
+                if table.find(group, modName) then
+                    for _, activeMod in ipairs(activeModifiers) do
+                        if table.find(group, activeMod) then
+                            -- Excepția: Double Trouble și Triple Trouble au voie să fie adăugate în lista de "available"
+                            -- pentru a-l înlocui pe celălalt, dar alte conflicte sunt respinse!
+                            local isTroubleReplacement = (modName == "Double Trouble !" and activeMod == "Triple Trouble !") or
+                                                         (modName == "Triple Trouble !" and activeMod == "Double Trouble !")
+                            if not isTroubleReplacement then
+                                canAdd = false
+                                break
+                            end
+                        end
+                    end
+                end
+                if not canAdd then break end
+            end
+        end
 
         -- Check player count constraints
         if canAdd and modName == "Double Trouble !" and activePlayerCount < 3 then canAdd = false end
