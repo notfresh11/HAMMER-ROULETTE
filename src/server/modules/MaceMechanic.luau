@@ -237,10 +237,13 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
     local function cleanup()
         roundActive = false
         currentPlayer = nil
-        if pendingLandingEnd then
-            task.cancel(pendingLandingEnd)
-            pendingLandingEnd = nil
+
+        -- Safely cancel the pending thread only if it's not the currently running thread
+        if pendingLandingEnd and coroutine.running() ~= pendingLandingEnd then
+            pcall(function() task.cancel(pendingLandingEnd) end)
         end
+        pendingLandingEnd = nil
+
         for _, conn in ipairs(connections) do
             conn:Disconnect()
         end
@@ -377,15 +380,14 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                             humanoid.JumpHeight = 7.2
                         end
                     else
-                        pendingLandingEnd = task.delay(0.05, function()
-                            if roundActive then
-                                print(player.Name .. " a aterizat si runda se reseteaza!")
-                                cleanup()
-                                if onRoundEndCallback then
-                                    onRoundEndCallback()
-                                end
+                        -- Nu mai punem delay de 0.05 secunde, cand pica, e instant over
+                        if roundActive then
+                            print(player.Name .. " a aterizat si runda se reseteaza!")
+                            cleanup()
+                            if onRoundEndCallback then
+                                onRoundEndCallback()
                             end
-                        end)
+                        end
                     end
                 end
                 end
@@ -730,10 +732,10 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
         end
 
         if hitRegistered then
-            if pendingLandingEnd then
-                task.cancel(pendingLandingEnd)
-                pendingLandingEnd = nil
+            if pendingLandingEnd and coroutine.running() ~= pendingLandingEnd then
+                pcall(function() task.cancel(pendingLandingEnd) end)
             end
+            pendingLandingEnd = nil
 
             hasStartedFalling = true
             fallStartTick = tick()
