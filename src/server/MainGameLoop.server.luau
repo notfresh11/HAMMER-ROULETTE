@@ -190,7 +190,6 @@ local function gameLoop()
 
             -- Bucla de Runde (cât timp sunt cel puțin 2 supraviețuitori în meci)
             local isFirstRound = true
-            local isTeleportFirstRound = true
             while #activePlayers > 1 do
                 print("MainLoop: Începem o NOUĂ RUNDĂ cu " .. #activePlayers .. " supraviețuitori.")
 
@@ -202,6 +201,19 @@ local function gameLoop()
                 -- Ensure all players have correct baseline stats updated for the new modifier
                 for _, player in ipairs(activePlayers) do
                     ModifierManager.ReapplyPlayerStates(player)
+                    -- Force Reset Scales for Grow/Shrink Modifier
+                    if player.Character then
+                        local hum = player.Character:FindFirstChild("Humanoid")
+                        if hum then
+                            local scales = {"BodyDepthScale", "BodyHeightScale", "BodyWidthScale", "HeadScale"}
+                            for _, scaleName in ipairs(scales) do
+                                local val = hum:FindFirstChild(scaleName)
+                                if val and val:IsA("NumberValue") then
+                                    val.Value = 1
+                                end
+                            end
+                        end
+                    end
                 end
 
                 local numMaces = 1
@@ -299,18 +311,13 @@ local function gameLoop()
                     setHammerVisibility(currentHammer, true)
                 end
 
-                -- Only teleport players to spawns on the FIRST round.
-                -- Otherwise they stay in the arena where they are.
-                if isTeleportFirstRound then
-                    Matchmaking.teleportPlayersToSpawns(activePlayers, currentMap)
-                end
+                -- Teleport players to their spawn points on every round
+                Matchmaking.teleportPlayersToSpawns(activePlayers, currentMap)
 
                 -- Block player movement while roulette spins
                 setPlayersAnchored(activePlayers, true)
 
                 task.wait(1) -- small delay for physics/camera to settle
-
-                isTeleportFirstRound = false
 
                 local chosenPlayers = Roulette.selectMaceBearers(activePlayers, numMaces)
 

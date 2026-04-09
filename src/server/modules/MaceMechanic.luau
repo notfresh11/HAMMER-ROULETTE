@@ -598,10 +598,19 @@ function MaceMechanic.startMechanic(player, onRoundEndCallback, isTraining, allM
                                         local otherRoot = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
                                         if otherRoot then
                                             local dist = (otherRoot.Position - blastPos).Magnitude
-                                            if dist < 30 then
+                                            if dist < 45 then
                                                 local dir = (otherRoot.Position - blastPos).Unit
-                                                if dir.Magnitude == 0 then dir = Vector3.new(0,1,0) end
-                                                otherRoot.AssemblyLinearVelocity = dir * 50 + Vector3.new(0, 30, 0)
+                                                -- Flatten direction to knock them OUTWARDS, not just directly away
+                                                -- (which could be too high/low depending on slope)
+                                                dir = Vector3.new(dir.X, 0, dir.Z).Unit
+                                                if dir.Magnitude ~= dir.Magnitude then dir = Vector3.new(1,0,0) end -- NaN check
+
+                                                -- Un-anchor temporarily if needed, though players usually aren't
+                                                -- Knockback scaled by proximity: closer = stronger
+                                                local force = 120 * (1 - (dist / 45))
+                                                force = math.max(60, force) -- guarantee at least some force
+
+                                                otherRoot.AssemblyLinearVelocity = dir * force + Vector3.new(0, 50, 0)
                                             end
                                         end
                                     end

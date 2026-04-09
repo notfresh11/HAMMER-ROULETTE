@@ -1,0 +1,63 @@
+<<<<<<< SEARCH
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            if isGhost then
+                if not part:GetAttribute("OrigTransparency") then
+                    part:SetAttribute("OrigTransparency", part.Transparency)
+                end
+                part.Transparency = 1
+            else
+                local orig = part:GetAttribute("OrigTransparency")
+                if orig then
+                    part.Transparency = orig
+                    part:SetAttribute("OrigTransparency", nil)
+                end
+            end
+        elseif part:IsA("Decal") then
+            if isGhost then
+                if not part:GetAttribute("OrigTransparency") then
+                    part:SetAttribute("OrigTransparency", part.Transparency)
+                end
+                part.Transparency = 1
+            else
+                local orig = part:GetAttribute("OrigTransparency")
+                if orig then
+                    part.Transparency = orig
+                    part:SetAttribute("OrigTransparency", nil)
+                end
+            end
+        end
+    end
+=======
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            if isGhost then
+                if not part:GetAttribute("OrigTransparency") then
+                    part:SetAttribute("OrigTransparency", part.Transparency)
+                end
+                -- To make the highlight visible, the part transparency must NOT be exactly 1
+                -- 0.99 transparency makes it effectively invisible but still allows Highlight rendering
+                part.Transparency = 0.99
+            else
+                local orig = part:GetAttribute("OrigTransparency")
+                if orig then
+                    part.Transparency = orig
+                    part:SetAttribute("OrigTransparency", nil)
+                end
+            end
+        elseif part:IsA("Decal") then
+            if isGhost then
+                if not part:GetAttribute("OrigTransparency") then
+                    part:SetAttribute("OrigTransparency", part.Transparency)
+                end
+                part.Transparency = 0.99
+            else
+                local orig = part:GetAttribute("OrigTransparency")
+                if orig then
+                    part.Transparency = orig
+                    part:SetAttribute("OrigTransparency", nil)
+                end
+            end
+        end
+    end
+>>>>>>> REPLACE
