@@ -968,6 +968,54 @@ if clientModifierEvent then
                 FogEnd = data.End,
                 FogStart = data.Start
             }):Play()
+
+            if data.End == 30 then
+                local cc = Lighting:FindFirstChild("IcantseeColorCorrection")
+                if not cc then
+                    cc = Instance.new("ColorCorrectionEffect")
+                    cc.Name = "IcantseeColorCorrection"
+                    cc.Parent = Lighting
+                end
+                TweenService:Create(cc, TweenInfo.new(1), {Brightness = -0.5, Contrast = 0.5, TintColor = Color3.new(0, 0, 0)}):Play()
+            else
+                local cc = Lighting:FindFirstChild("IcantseeColorCorrection")
+                if cc then TweenService:Create(cc, TweenInfo.new(1), {Brightness = 0, Contrast = 0, TintColor = Color3.new(1, 1, 1)}):Play() end
+            end
+        elseif modType == "AddLocalOutline" then
+            local char = data.Character
+            if char then
+                local highlight = char:FindFirstChild("LocalGhostHighlight")
+                if not highlight then
+                    highlight = Instance.new("Highlight")
+                    highlight.Name = "LocalGhostHighlight"
+                    highlight.FillTransparency = 1
+                    highlight.OutlineTransparency = 0
+                    highlight.Parent = char
+                end
+                highlight.OutlineColor = data.Color or Color3.new(1, 0, 0)
+            end
+        elseif modType == "RemoveLocalOutline" then
+            local char = data.Character
+            if char then
+                local highlight = char:FindFirstChild("LocalGhostHighlight")
+                if highlight then highlight:Destroy() end
+            end
         end
     end)
 end
+
+local shockwaveEvent = ReplicatedStorage:WaitForChild("ShockwaveVfxEvent", 10)
+if shockwaveEvent then
+    shockwaveEvent.OnClientEvent:Connect(function(blastPos)
+        local Workspace = game:GetService("Workspace")
+        local TweenService = game:GetService("TweenService")
+        local Debris = game:GetService("Debris")
+
+        local shock = Instance.new("Part")
+        shock.Shape = Enum.PartType.Cylinder
+        shock.Size = Vector3.new(0.5, 5, 5)
+        shock.CFrame = CFrame.new(blastPos) * CFrame.Angles(0, 0, math.rad(90))
+        shock.Color = Color3.new(1, 1, 1)
+        shock.Material = Enum.Material.Neon
+        shock.Transparency = 0.2
+        shock.Anchored = true

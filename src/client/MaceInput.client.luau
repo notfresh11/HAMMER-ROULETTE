@@ -40,8 +40,14 @@ if bounceEvent then
                 humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
 
                 -- Fixăm Y-ul la o valoare fixă, păstrând inerția orizontală, ca săritura să fie mereu la fel de înaltă
-                rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, 125, rootPart.AssemblyLinearVelocity.Z)
-                print("MaceInput: S-a separat de sol si Viteza Y a fost setată exact la 125!")
+                local bounceHeight = 125
+                local Workspace = game:GetService("Workspace")
+                if Workspace.Gravity < 100 then
+                    bounceHeight = 65 -- Adjust bounce for Low Gravity modifier
+                end
+
+                rootPart.AssemblyLinearVelocity = Vector3.new(rootPart.AssemblyLinearVelocity.X, bounceHeight, rootPart.AssemblyLinearVelocity.Z)
+                print("MaceInput: S-a separat de sol si Viteza Y a fost setată exact la " .. tostring(bounceHeight) .. "!")
             end
         end
     end)

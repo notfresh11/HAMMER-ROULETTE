@@ -97,7 +97,11 @@ function MapManager.cleanupCurrentMap()
         currentMapInstance = nil
     end
     if currentHammerInstance then
-        currentHammerInstance:Destroy()
+        if type(currentHammerInstance) == "table" then
+            for _, h in ipairs(currentHammerInstance) do h:Destroy() end
+        else
+            currentHammerInstance:Destroy()
+        end
         currentHammerInstance = nil
     end
 end
@@ -106,7 +110,8 @@ function MapManager.getCurrentMap()
     return currentMapInstance
 end
 
-function MapManager.chooseAndSpawnMap()
+function MapManager.chooseAndSpawnMap(numMaces)
+    numMaces = numMaces or 1
     MapManager.cleanupCurrentMap()
 
     local availableMaps = {}
@@ -196,46 +201,56 @@ function MapManager.chooseAndSpawnMap()
     -- Spawnează Ciocanul Vizual (idle) în centrul hărții
     local hammerModelTemplate = mapStorage:FindFirstChild("HammerModel")
     if hammerModelTemplate and hammerSpawnPart then
-        currentHammerInstance = hammerModelTemplate:Clone()
-        currentHammerInstance.Parent = Workspace
-
-        local isModel = currentHammerInstance:IsA("Model")
+        currentHammerInstance = {}
+        local isModel = hammerModelTemplate:IsA("Model")
         local hammerHeight = 1
 
         if isModel then
-            if not currentHammerInstance.PrimaryPart then
-                currentHammerInstance.PrimaryPart = currentHammerInstance:FindFirstChildWhichIsA("BasePart", true)
-            end
-            -- Ancora pieselor
-            for _, part in ipairs(currentHammerInstance:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.Anchored = true
-                    part.CanCollide = false
-                end
-            end
-            if currentHammerInstance.PrimaryPart then
-                -- Try to use size from union if it's the primary part, fallback to size Y or Z based on standard orientation
-                -- Since we rotate 90 degrees on X, the local Z axis determines the thickness vertically
-                hammerHeight = currentHammerInstance.PrimaryPart.Size.Z / 2
-            end
-        else
-            currentHammerInstance.Anchored = true
-            currentHammerInstance.CanCollide = false
-            if currentHammerInstance:IsA("BasePart") then
-                hammerHeight = currentHammerInstance.Size.Z / 2
-            end
+            local primary = hammerModelTemplate.PrimaryPart or hammerModelTemplate:FindFirstChildWhichIsA("BasePart", true)
+            if primary then hammerHeight = primary.Size.Z / 2 end
+        elseif hammerModelTemplate:IsA("BasePart") then
+            hammerHeight = hammerModelTemplate.Size.Z / 2
         end
 
-        -- Plasam fix deasupra centrului (HammerSpawn-ului proaspat mutat)
-        local targetHammerCFrame = hammerSpawnPart.CFrame * CFrame.new(0, (hammerSpawnPart.Size.Y/2) + hammerHeight, 0) * CFrame.Angles(math.rad(90), 0, 0)
+        local radius = numMaces > 1 and 3 or 0
 
-        if isModel and currentHammerInstance.PrimaryPart then
-            currentHammerInstance:PivotTo(targetHammerCFrame)
-        elseif currentHammerInstance:IsA("BasePart") then
-            currentHammerInstance.CFrame = targetHammerCFrame
+        for i = 1, numMaces do
+            local hammerInst = hammerModelTemplate:Clone()
+            hammerInst.Parent = Workspace
+
+            if isModel then
+                if not hammerInst.PrimaryPart then
+                    hammerInst.PrimaryPart = hammerInst:FindFirstChildWhichIsA("BasePart", true)
+                end
+                for _, part in ipairs(hammerInst:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.Anchored = true
+                        part.CanCollide = false
+                    end
+                end
+            else
+                hammerInst.Anchored = true
+                hammerInst.CanCollide = false
+            end
+
+            local angle = (math.pi * 2 / numMaces) * i
+            local offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+            local targetHammerCFrame = hammerSpawnPart.CFrame * CFrame.new(offset) * CFrame.new(0, (hammerSpawnPart.Size.Y/2) + hammerHeight, 0) * CFrame.Angles(math.rad(90), 0, 0)
+
+            if isModel and hammerInst.PrimaryPart then
+                hammerInst:PivotTo(targetHammerCFrame)
+            elseif hammerInst:IsA("BasePart") then
+                hammerInst.CFrame = targetHammerCFrame
+            end
+
+            table.insert(currentHammerInstance, hammerInst)
         end
     else
         warn("MapManager: HammerModel template lipseste sau nu exista HammerSpawnPart!")
+    end
+
+    if currentHammerInstance and #currentHammerInstance == 1 then
+        currentHammerInstance = currentHammerInstance[1]
     end
 
     return currentMapInstance, currentHammerInstance

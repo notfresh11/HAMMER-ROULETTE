@@ -203,16 +203,6 @@ local function gameLoop()
                     ModifierManager.ReapplyPlayerStates(player)
                 end
 
-                -- Ensure hammer is visible at round start
-                setHammerVisibility(currentHammer, true)
-
-                Matchmaking.teleportPlayersToSpawns(activePlayers, currentMap)
-
-                -- Block player movement while roulette spins
-                setPlayersAnchored(activePlayers, true)
-
-                task.wait(1) -- small delay for physics/camera to settle
-
                 local numMaces = 1
                 if ModifierManager.IsModifierActive("Triple Trouble !") then
                     numMaces = 3
@@ -225,18 +215,37 @@ local function gameLoop()
                     numMaces = math.max(1, #activePlayers - 1)
                 end
 
+                -- Adjust Map Hammers based on numMaces
+                currentMap, currentHammer = MapManager.chooseAndSpawnMap(numMaces)
+
+                -- Ensure hammer is visible at round start
+                if type(currentHammer) == "table" then
+                    for _, h in ipairs(currentHammer) do setHammerVisibility(h, true) end
+                else
+                    setHammerVisibility(currentHammer, true)
+                end
+
+                Matchmaking.teleportPlayersToSpawns(activePlayers, currentMap)
+
+                -- Block player movement while roulette spins
+                setPlayersAnchored(activePlayers, true)
+
+                task.wait(1) -- small delay for physics/camera to settle
+
                 local chosenPlayers = Roulette.selectMaceBearers(activePlayers, numMaces)
 
                 if #chosenPlayers > 0 then
-                    -- Only animate the first one to avoid chaos, or adapt animation.
-                    -- For now, just animate the first one, but assign to all.
-                    Roulette.playRouletteAnimation(chosenPlayers[1], currentHammer)
+                    Roulette.playRouletteAnimation(chosenPlayers, currentHammer)
 
                     -- Unblock movement now that roulette has finished
                     setPlayersAnchored(activePlayers, false)
 
                     -- Hide visual hammer because the player picked it up
-                    setHammerVisibility(currentHammer, false)
+                    if type(currentHammer) == "table" then
+                        for _, h in ipairs(currentHammer) do setHammerVisibility(h, false) end
+                    else
+                        setHammerVisibility(currentHammer, false)
+                    end
 
                     local roundEnded = false
                     local activeAttackers = #chosenPlayers
