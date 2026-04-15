@@ -1,0 +1,360 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Constants
+local CLICK_SOUND_ID = "rbxassetid://124476359159008"
+
+local activeConnections = {}
+
+local function disconnectAll()
+    for _, conn in ipairs(activeConnections) do
+        if conn then conn:Disconnect() end
+    end
+    table.clear(activeConnections)
+end
+
+local function playSoundIsolated(soundId)
+    if not soundId or soundId == "" then return end
+    local sound = Instance.new("Sound")
+    sound.SoundId = soundId
+    sound.Parent = game:GetService("SoundService")
+    sound.TimePosition = 0.05
+    sound.Ended:Connect(function() sound:Destroy() end)
+    task.delay(10, function()
+        if sound and sound.Parent then sound:Destroy() end
+    end)
+    sound:Play()
+end
+
+local function bindHoverAnimation(button)
+    if not button or not button:IsA("GuiObject") then return end
+
+    if not button:GetAttribute("OrigSizeXScale") then
+        button:SetAttribute("OrigSizeXScale", button.Size.X.Scale)
+        button:SetAttribute("OrigSizeXOffset", button.Size.X.Offset)
+        button:SetAttribute("OrigSizeYScale", button.Size.Y.Scale)
+        button:SetAttribute("OrigSizeYOffset", button.Size.Y.Offset)
+    end
+
+    local originalSize = UDim2.new(
+        button:GetAttribute("OrigSizeXScale"),
+        button:GetAttribute("OrigSizeXOffset"),
+        button:GetAttribute("OrigSizeYScale"),
+        button:GetAttribute("OrigSizeYOffset")
+    )
+
+    local targetSize = UDim2.new(
+        originalSize.X.Scale * 1.05, originalSize.X.Offset * 1.05,
+        originalSize.Y.Scale * 1.05, originalSize.Y.Offset * 1.05
+    )
+
+    if button:IsA("GuiButton") then
+        local clickSize = UDim2.new(
+            originalSize.X.Scale * 0.95, originalSize.X.Offset * 0.95,
+            originalSize.Y.Scale * 0.95, originalSize.Y.Offset * 0.95
+        )
+        table.insert(activeConnections, button.MouseButton1Down:Connect(function()
+            TweenService:Create(button, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = clickSize}):Play()
+        end))
+        table.insert(activeConnections, button.MouseButton1Up:Connect(function()
+            TweenService:Create(button, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
+        end))
+    end
+
+    table.insert(activeConnections, button.MouseEnter:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
+    end))
+    table.insert(activeConnections, button.MouseLeave:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = originalSize}):Play()
+    end))
+end
+
+-- Funcție pentru animarea ferestrelor (deschidere)
+local function openMenu(frame)
+    if not frame then return end
+    frame.Visible = true
+
+    if not frame:GetAttribute("OriginalSizeXScale") then
+        frame:SetAttribute("OriginalSizeXScale", frame.Size.X.Scale)
+        frame:SetAttribute("OriginalSizeXOffset", frame.Size.X.Offset)
+        frame:SetAttribute("OriginalSizeYScale", frame.Size.Y.Scale)
+        frame:SetAttribute("OriginalSizeYOffset", frame.Size.Y.Offset)
+    end
+
+    local targetSize = UDim2.new(
+        frame:GetAttribute("OriginalSizeXScale"),
+        frame:GetAttribute("OriginalSizeXOffset"),
+        frame:GetAttribute("OriginalSizeYScale"),
+        frame:GetAttribute("OriginalSizeYOffset")
+    )
+
+    frame.Size = UDim2.new(0, 0, 0, 0)
+    local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    local tween = TweenService:Create(frame, tweenInfo, {Size = targetSize})
+    tween:Play()
+end
+
+local function setupSocialUI()
+    disconnectAll()
+
+    local mainUI = playerGui:WaitForChild("MAINUI", 10)
+    local socialGui = playerGui:WaitForChild("Social", 10)
+
+    if not mainUI or not socialGui then
+        warn("SocialUI: Could not find MAINUI or Social GUI.")
+        return
+    end
+
+    socialGui.Enabled = true
+
+    local socialsButton = mainUI:FindFirstChild("SocialsButton")
+    if not socialsButton then
+        local cornerBtns = mainUI:FindFirstChild("CornerButtons")
+        if cornerBtns then socialsButton = cornerBtns:FindFirstChild("SocialsButton") end
+    end
+
+    local socialMainFrame = socialGui:FindFirstChild("MainFrame")
+    if not socialsButton or not socialMainFrame then
+        warn("SocialUI: Missing SocialsButton or MainFrame")
+        return
+    end
+
+    socialMainFrame.Visible = false
+
+    local friendTab = socialMainFrame:FindFirstChild("Friend")
+    if not friendTab then return end
+
+    -- Meniurile
+    local inviteFriendMenu = friendTab:FindFirstChild("INVITEFRIEND")
+    local addFriendMenu = friendTab:FindFirstChild("ADDFRIEND") -- Acesta este Frame-ul pentru add
+
+    -- Ascundem ambele la deschiderea meniului
+    if inviteFriendMenu then inviteFriendMenu.Visible = false end
+    if addFriendMenu then addFriendMenu.Visible = false end
+
+    -- Găsim butoanele de tab-uri (pot avea același nume ca meniurile sau nume specifice)
+    -- Pe baza imaginii, exista butoane TextButton la fel numite: ADDFRIEND, INVITEFRIEND, etc.
+    local addFriendBtn = friendTab:FindFirstChild("ADDFRIEND", true) -- Trecem prin toți copiii
+    -- Atenție: Dacă Frame-ul și Butonul au același nume, le diferențiem prin Clasă
+    for _, child in ipairs(friendTab:GetChildren()) do
+        if child.Name == "ADDFRIEND" and child:IsA("GuiButton") then
+            addFriendBtn = child
+        end
+    end
+
+    local inviteFriendBtn = nil
+    for _, child in ipairs(friendTab:GetChildren()) do
+        if child.Name == "INVITEFRIEND" and child:IsA("GuiButton") then
+            inviteFriendBtn = child
+        end
+    end
+
+    -- Buton de Close pentru Social (daca exista ExitButton)
+    local exitBtn = socialMainFrame:FindFirstChild("ExitButton") or socialMainFrame:FindFirstChild("CloseButton")
+    if exitBtn then
+        bindHoverAnimation(exitBtn)
+        table.insert(activeConnections, exitBtn.MouseButton1Click:Connect(function()
+            playSoundIsolated(CLICK_SOUND_ID)
+            socialMainFrame.Visible = false
+        end))
+    end
+
+    -- Toggle Social Menu
+    bindHoverAnimation(socialsButton)
+    table.insert(activeConnections, socialsButton.MouseButton1Click:Connect(function()
+        playSoundIsolated(CLICK_SOUND_ID)
+        local wasVisible = socialMainFrame.Visible
+        if not wasVisible then
+            openMenu(socialMainFrame)
+            -- Ascunde sub-meniurile când se deschide Social
+            if inviteFriendMenu then inviteFriendMenu.Visible = false end
+            if addFriendMenu then addFriendMenu.Visible = false end
+        else
+            socialMainFrame.Visible = false
+        end
+    end))
+
+    -- TAB: INVITE FRIEND LOGIC
+    if inviteFriendBtn and inviteFriendMenu then
+        bindHoverAnimation(inviteFriendBtn)
+
+        local template = inviteFriendMenu:FindFirstChild("EXAMPLEFRIENDLIST")
+        if template then template.Visible = false end
+
+        table.insert(activeConnections, inviteFriendBtn.MouseButton1Click:Connect(function()
+            playSoundIsolated(CLICK_SOUND_ID)
+            if addFriendMenu then addFriendMenu.Visible = false end
+            openMenu(inviteFriendMenu)
+
+            if template then
+                -- Curățăm lista existentă
+                for _, child in ipairs(inviteFriendMenu:GetChildren()) do
+                    if child:IsA("GuiObject") and child.Name ~= "EXAMPLEFRIENDLIST" and child.Name ~= "UIListLayout" and not child:IsA("UICorner") then
+                        child:Destroy()
+                    end
+                end
+
+                -- Aducem prietenii async
+                task.spawn(function()
+                    local success, friendPages = pcall(function()
+                        return Players:GetFriendsAsync(player.UserId)
+                    end)
+
+                    if success and friendPages then
+                        while true do
+                            for _, friend in ipairs(friendPages:GetCurrentPage()) do
+                                local newFrame = template:Clone()
+                                newFrame.Name = "Friend_" .. friend.Username
+                                newFrame.Visible = true
+
+                                local textLabel = newFrame:FindFirstChild("TextLabel")
+                                if textLabel then textLabel.Text = friend.Username end
+
+                                local imgLabel = newFrame:FindFirstChild("ImageLabel")
+                                if imgLabel then
+                                    task.spawn(function()
+                                        local succ, thumb = pcall(function()
+                                            return Players:GetUserThumbnailAsync(friend.Id, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+                                        end)
+                                        if succ then imgLabel.Image = thumb end
+                                    end)
+                                end
+
+                                local invPartyBtn = newFrame:FindFirstChild("INVITEPARTY")
+                                local invGameBtn = newFrame:FindFirstChild("INVITEGAME")
+
+                                if invPartyBtn then
+                                    bindHoverAnimation(invPartyBtn)
+                                    invPartyBtn.MouseButton1Click:Connect(function()
+                                        playSoundIsolated(CLICK_SOUND_ID)
+                                        print("[Socials] Invited " .. friend.Username .. " to Party! (Placeholder)")
+                                    end)
+                                end
+
+                                if invGameBtn then
+                                    bindHoverAnimation(invGameBtn)
+                                    invGameBtn.MouseButton1Click:Connect(function()
+                                        playSoundIsolated(CLICK_SOUND_ID)
+                                        print("[Socials] Invited " .. friend.Username .. " to Game! (Placeholder)")
+                                    end)
+                                end
+
+                                newFrame.Parent = inviteFriendMenu
+                            end
+
+                            if friendPages.IsFinished then break end
+                            friendPages:AdvanceToNextPageAsync()
+                        end
+                    else
+                        warn("SocialUI: Failed to fetch friends")
+                    end
+                end)
+            end
+        end))
+    end
+
+    -- TAB: ADD FRIEND LOGIC
+    if addFriendBtn and addFriendMenu then
+        bindHoverAnimation(addFriendBtn)
+
+        local searchFrame = addFriendMenu:FindFirstChild("SearchFrame")
+        local userFrame = addFriendMenu:FindFirstChild("USERFRAME")
+
+        if userFrame then userFrame.Visible = false end
+
+        table.insert(activeConnections, addFriendBtn.MouseButton1Click:Connect(function()
+            playSoundIsolated(CLICK_SOUND_ID)
+            if inviteFriendMenu then inviteFriendMenu.Visible = false end
+            openMenu(addFriendMenu)
+            if userFrame then userFrame.Visible = false end
+        end))
+
+        if searchFrame and userFrame then
+            local searchBox = searchFrame:FindFirstChild("TextBox")
+            local currentSearchUserId = nil
+            local currentSearchUsername = nil
+
+            -- Bind static button events ONLY ONCE outside of the search loop
+            local addBtn = userFrame:FindFirstChild("ADDFRIEND")
+            local invitePartyBtn = userFrame:FindFirstChild("INVITEPARTY")
+
+            if addBtn then
+                bindHoverAnimation(addBtn)
+                table.insert(activeConnections, addBtn.MouseButton1Click:Connect(function()
+                    playSoundIsolated(CLICK_SOUND_ID)
+                    if not currentSearchUserId then return end
+
+                    pcall(function()
+                        local targetPlayer = Players:GetPlayerByUserId(currentSearchUserId)
+                        if targetPlayer then
+                            StarterGui:SetCore("PromptSendFriendRequest", targetPlayer)
+                        else
+                            print("[Socials] Poti da add doar jucatorilor din server (via SetCore). Pentru viitor, vom adauga un API custom. (Placeholder)")
+                        end
+                    end)
+                end))
+            end
+
+            if invitePartyBtn then
+                bindHoverAnimation(invitePartyBtn)
+                table.insert(activeConnections, invitePartyBtn.MouseButton1Click:Connect(function()
+                    playSoundIsolated(CLICK_SOUND_ID)
+                    if currentSearchUsername then
+                        print("[Socials] Invited " .. currentSearchUsername .. " to Party! (Placeholder)")
+                    end
+                end))
+            end
+
+            if searchBox then
+                table.insert(activeConnections, searchBox.FocusLost:Connect(function(enterPressed)
+                    if enterPressed then
+                        local username = searchBox.Text
+                        if username == "" then return end
+
+                        playSoundIsolated(CLICK_SOUND_ID)
+
+                        task.spawn(function()
+                            local success, userId = pcall(function()
+                                return Players:GetUserIdFromNameAsync(username)
+                            end)
+
+                            if success and userId then
+                                currentSearchUserId = userId
+                                currentSearchUsername = username
+
+                                local textLabel = userFrame:FindFirstChild("TextLabel")
+                                if textLabel then textLabel.Text = username end
+
+                                local imgLabel = userFrame:FindFirstChild("ImageLabel")
+                                if imgLabel then
+                                    local succ, thumb = pcall(function()
+                                        return Players:GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+                                    end)
+                                    if succ then imgLabel.Image = thumb end
+                                end
+
+                                userFrame.Visible = true
+                            else
+                                warn("SocialUI: User not found!")
+                                currentSearchUserId = nil
+                                currentSearchUsername = nil
+                                if userFrame then userFrame.Visible = false end
+                            end
+                        end)
+                    end
+                end))
+            end
+        end
+    end
+end
+
+setupSocialUI()
+
+player.CharacterAdded:Connect(function()
+    task.wait(0.2)
+    setupSocialUI()
+end)
