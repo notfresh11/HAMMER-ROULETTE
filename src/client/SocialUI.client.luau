@@ -204,7 +204,7 @@ local function setupSocialUI()
         table.insert(activeConnections, inviteFriendBtn.MouseButton1Click:Connect(function()
             playSoundIsolated(CLICK_SOUND_ID)
             if addFriendMenu then addFriendMenu.Visible = false end
-            openMenu(inviteFriendMenu)
+            inviteFriendMenu.Visible = true
 
             if template then
                 -- Curățăm lista existentă
@@ -286,7 +286,7 @@ local function setupSocialUI()
         table.insert(activeConnections, addFriendBtn.MouseButton1Click:Connect(function()
             playSoundIsolated(CLICK_SOUND_ID)
             if inviteFriendMenu then inviteFriendMenu.Visible = false end
-            openMenu(addFriendMenu)
+            addFriendMenu.Visible = true
             if userFrame then userFrame.Visible = false end
         end))
 
