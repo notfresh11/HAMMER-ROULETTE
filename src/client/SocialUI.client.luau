@@ -106,6 +106,153 @@ local function openMenu(frame)
     tween:Play()
 end
 
+local partyUpdateEvent = ReplicatedStorage:WaitForChild("PartyUpdateEvent")
+local partyActionEvent = ReplicatedStorage:WaitForChild("PartyActionEvent")
+
+local currentPartyData = nil
+
+local function setupPartyUI(socialMainFrame)
+    local partyTab = socialMainFrame:FindFirstChild("Party") or socialMainFrame
+    local partyInfo = partyTab:FindFirstChild("PartyInfo")
+    local memberInfo = partyTab:FindFirstChild("MemberInfo")
+    if not partyInfo or not memberInfo then return end
+
+    memberInfo.Visible = false
+    partyInfo.Visible = true
+
+    local topText = partyInfo:FindFirstChild("TextLabel")
+    local leaveBtn = partyInfo:FindFirstChild("LEAVE") or partyInfo:FindFirstChild("LEAVEBUTTON") or partyInfo:FindFirstChild("LeaveButton")
+
+    if leaveBtn then
+        bindHoverAnimation(leaveBtn)
+        table.insert(activeConnections, leaveBtn.MouseButton1Click:Connect(function()
+            playSoundIsolated(CLICK_SOUND_ID)
+            partyActionEvent:FireServer("leave", {})
+        end))
+    end
+
+    local kickBtn = memberInfo:FindFirstChild("KICKBUTTON")
+    local promoteBtn = memberInfo:FindFirstChild("PROMOTEBUTTON")
+    local backBtn = memberInfo:FindFirstChild("BACKBUTTON")
+
+    local selectedUserId = nil
+
+    if backBtn then
+        bindHoverAnimation(backBtn)
+        table.insert(activeConnections, backBtn.MouseButton1Click:Connect(function()
+            playSoundIsolated(CLICK_SOUND_ID)
+            memberInfo.Visible = false
+            partyInfo.Visible = true
+        end))
+    end
+
+    if kickBtn then
+        bindHoverAnimation(kickBtn)
+        table.insert(activeConnections, kickBtn.MouseButton1Click:Connect(function()
+            playSoundIsolated(CLICK_SOUND_ID)
+            if selectedUserId then
+                partyActionEvent:FireServer("kick", {targetUserId = selectedUserId})
+                memberInfo.Visible = false
+                partyInfo.Visible = true
+            end
+        end))
+    end
+
+    if promoteBtn then
+        bindHoverAnimation(promoteBtn)
+        table.insert(activeConnections, promoteBtn.MouseButton1Click:Connect(function()
+            playSoundIsolated(CLICK_SOUND_ID)
+            if selectedUserId then
+                partyActionEvent:FireServer("promote", {targetUserId = selectedUserId})
+                memberInfo.Visible = false
+                partyInfo.Visible = true
+            end
+        end))
+    end
+
+    table.insert(activeConnections, partyUpdateEvent.OnClientEvent:Connect(function(payload)
+        currentPartyData = payload
+        if topText then
+            topText.Text = payload.ownerName .. "'S PARTY " .. #payload.members .. "/4"
+        end
+
+        local isLocalOwner = (payload.owner == player.UserId)
+
+        for i = 1, 4 do
+            local slot = partyInfo:FindFirstChild("MEMBER" .. i)
+            if not slot then continue end
+
+            local memberData = payload.members[i]
+            if memberData then
+                slot.Visible = true
+                local nameLabel = slot:FindFirstChild("TextLabel")
+                if nameLabel then nameLabel.Text = memberData.name end
+
+                local imgLabel = slot:FindFirstChild("ImageLabel")
+                if imgLabel then
+                    task.spawn(function()
+                        local succ, thumb = pcall(function()
+                            return Players:GetUserThumbnailAsync(memberData.userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+                        end)
+                        if succ then imgLabel.Image = thumb end
+                    end)
+                end
+
+                local infoBtn = slot:FindFirstChild("InfoButton") or slot:FindFirstChild("INFO")
+                if infoBtn then
+                    if isLocalOwner and memberData.userId ~= player.UserId then
+                        infoBtn.Visible = true
+                    else
+                        infoBtn.Visible = false
+                    end
+                end
+            else
+                slot.Visible = false
+            end
+        end
+    end))
+
+    for i = 1, 4 do
+        local slot = partyInfo:FindFirstChild("MEMBER" .. i)
+        if not slot then continue end
+        local infoBtn = slot:FindFirstChild("InfoButton") or slot:FindFirstChild("INFO")
+        if infoBtn then
+            bindHoverAnimation(infoBtn)
+            table.insert(activeConnections, infoBtn.MouseButton1Click:Connect(function()
+                playSoundIsolated(CLICK_SOUND_ID)
+                if not currentPartyData or not currentPartyData.members[i] then return end
+
+                local memberData = currentPartyData.members[i]
+                selectedUserId = memberData.userId
+
+                local nameLabel = memberInfo:FindFirstChild("TextLabel")
+                if nameLabel then nameLabel.Text = memberData.name end
+
+                local imgLabel = memberInfo:FindFirstChild("ImageLabel")
+                if imgLabel then
+                    task.spawn(function()
+                        local succ, thumb = pcall(function()
+                            return Players:GetUserThumbnailAsync(memberData.userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+                        end)
+                        if succ then imgLabel.Image = thumb end
+                    end)
+                end
+
+                local statusLabel = memberInfo:FindFirstChild("StatusLabel") or memberInfo:FindFirstChild("RoleLabel") or memberInfo:FindFirstChild("RoleText")
+                if statusLabel then
+                    statusLabel.Text = (currentPartyData.owner == memberData.userId) and "Owner" or "Member"
+                end
+
+                partyInfo.Visible = false
+                memberInfo.Visible = true
+            end))
+        end
+    end
+
+    -- Cere starea initiala de la server in caz ca a ratat evenimentul de la PlayerAdded
+    partyActionEvent:FireServer("fetch", {})
+end
+
 local function setupSocialUI()
     disconnectAll()
 
@@ -130,6 +277,8 @@ local function setupSocialUI()
         warn("SocialUI: Missing SocialButton or MainFrame")
         return
     end
+
+    setupPartyUI(socialMainFrame)
 
     -- Store original size manually BEFORE hiding or zeroing it out to prevent openMenu from breaking
     if not socialMainFrame:GetAttribute("OriginalSizeXScale") then
@@ -248,7 +397,8 @@ local function setupSocialUI()
                                     bindHoverAnimation(invPartyBtn)
                                     invPartyBtn.MouseButton1Click:Connect(function()
                                         playSoundIsolated(CLICK_SOUND_ID)
-                                        print("[Socials] Invited " .. friend.Username .. " to Party! (Placeholder)")
+                                        partyActionEvent:FireServer("invite", {targetUsername = friend.Username})
+                                        print("[Socials] Invited " .. friend.Username .. " to Party!")
                                     end)
                                 end
 
@@ -321,7 +471,8 @@ local function setupSocialUI()
                 table.insert(activeConnections, invitePartyBtn.MouseButton1Click:Connect(function()
                     playSoundIsolated(CLICK_SOUND_ID)
                     if currentSearchUsername then
-                        print("[Socials] Invited " .. currentSearchUsername .. " to Party! (Placeholder)")
+                        partyActionEvent:FireServer("invite", {targetUsername = currentSearchUsername})
+                        print("[Socials] Invited " .. currentSearchUsername .. " to Party!")
                     end
                 end))
             end
