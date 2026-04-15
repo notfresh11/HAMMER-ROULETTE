@@ -108,6 +108,8 @@ end
 
 local partyUpdateEvent = ReplicatedStorage:WaitForChild("PartyUpdateEvent")
 local partyActionEvent = ReplicatedStorage:WaitForChild("PartyActionEvent")
+local sendNotificationEvent = ReplicatedStorage:WaitForChild("SendNotificationEvent")
+
 
 local currentPartyData = nil
 
@@ -395,13 +397,16 @@ local function setupSocialUI()
 
                 -- Aducem prietenii async
                 task.spawn(function()
-                    local success, friendPages = pcall(function()
-                        return Players:GetFriendsAsync(player.UserId)
-                    end)
+                    local getFriendsFunction = ReplicatedStorage:FindFirstChild("FetchFriendsFunction")
+                    local friendList = {}
+                    if getFriendsFunction then
+                        friendList = getFriendsFunction:InvokeServer() or {}
+                    end
 
-                    if success and friendPages then
-                        while true do
-                            for _, friend in ipairs(friendPages:GetCurrentPage()) do
+                    local success = true
+
+                    if success then
+                        for _, friend in ipairs(friendList) do
                                 local newFrame = template:Clone()
                                 newFrame.Name = "Friend_" .. friend.Username
                                 newFrame.Visible = true
@@ -485,14 +490,10 @@ local function setupSocialUI()
                     playSoundIsolated(CLICK_SOUND_ID)
                     if not currentSearchUserId then return end
 
-                    pcall(function()
-                        local targetPlayer = Players:GetPlayerByUserId(currentSearchUserId)
-                        if targetPlayer then
-                            StarterGui:SetCore("PromptSendFriendRequest", targetPlayer)
-                        else
-                            print("[Socials] Poti da add doar jucatorilor din server (via SetCore). Pentru viitor, vom adauga un API custom. (Placeholder)")
-                        end
-                    end)
+                    -- Send Custom Friend Request
+                    print("[Socials] Trimis Friend Request catre: " .. currentSearchUsername)
+                    local sendNotificationEvent = game:GetService("ReplicatedStorage"):WaitForChild("SendNotificationEvent")
+                    sendNotificationEvent:FireServer(currentSearchUsername, "FriendRequest")
                 end))
             end
 
@@ -501,8 +502,22 @@ local function setupSocialUI()
                 table.insert(activeConnections, invitePartyBtn.MouseButton1Click:Connect(function()
                     playSoundIsolated(CLICK_SOUND_ID)
                     if currentSearchUsername then
-                        partyActionEvent:FireServer("invite", {targetUsername = currentSearchUsername})
+                        local sendNotificationEvent = game:GetService("ReplicatedStorage"):WaitForChild("SendNotificationEvent")
+                        sendNotificationEvent:FireServer(currentSearchUsername, "PartyInvite")
                         print("[Socials] Invited " .. currentSearchUsername .. " to Party!")
+                    end
+                end))
+            end
+
+            local inviteGameBtn = userFrame:FindFirstChild("INVITEGAMEBUTTUF")
+            if inviteGameBtn then
+                bindHoverAnimation(inviteGameBtn)
+                table.insert(activeConnections, inviteGameBtn.MouseButton1Click:Connect(function()
+                    playSoundIsolated(CLICK_SOUND_ID)
+                    if currentSearchUsername then
+                        local sendNotificationEvent = game:GetService("ReplicatedStorage"):WaitForChild("SendNotificationEvent")
+                        sendNotificationEvent:FireServer(currentSearchUsername, "GameInvite")
+                        print("[Socials] Invited " .. currentSearchUsername .. " to Game!")
                     end
                 end))
             end

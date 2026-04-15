@@ -1,6 +1,12 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Create the RemoteEvent FIRST, before any scripts try to wait for it or require modules
+if not ReplicatedStorage:FindFirstChild("FetchFriendsFunction") then
+    local ev = Instance.new("RemoteFunction")
+    ev.Name = "FetchFriendsFunction"
+    ev.Parent = ReplicatedStorage
+end
+
 local maceEventName = "MaceAttackEvent"
 if not ReplicatedStorage:FindFirstChild(maceEventName) then
     local event = Instance.new("RemoteEvent")
@@ -17,7 +23,7 @@ end
 
 -- UI Events
 -- UI Events and VFX
-local uiEvents = {"ShowCountdownEvent", "ShowTextEvent", "HideTextEvent", "VfxEvent", "ToggleAFKEvent", "ToggleMainUIEvent", "UpdateMatchmakingUIEvent", "PartyUpdateEvent", "PartyActionEvent"}
+local uiEvents = {"ShowCountdownEvent", "NotificationEvent", "NotificationResponseEvent", "SendNotificationEvent", "ShowTextEvent", "HideTextEvent", "VfxEvent", "ToggleAFKEvent", "ToggleMainUIEvent", "UpdateMatchmakingUIEvent", "PartyUpdateEvent", "PartyActionEvent"}
 for _, evName in ipairs(uiEvents) do
     if not ReplicatedStorage:FindFirstChild(evName) then
         local ev = Instance.new("RemoteEvent")
@@ -45,6 +51,8 @@ local AbilityManager = require(script.Parent.modules.AbilityManager)
 local TrainingManager = require(script.Parent.modules.TrainingManager)
 local ModifierManager = require(script.Parent.modules.ModifierManager)
 local PartyManager = require(script.Parent.modules.PartyManager)
+local NotificationManager = require(script.Parent.modules.NotificationManager)
+
 
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
@@ -569,6 +577,8 @@ end
 
 -- Start
 PartyManager.Init()
+NotificationManager.Start()
+
 AntiCheat.Start()
 TrainingManager.Start()
 setupMap()
