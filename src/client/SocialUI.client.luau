@@ -154,25 +154,12 @@ local function setupSocialUI()
     if inviteFriendMenu then inviteFriendMenu.Visible = false end
     if addFriendMenu then addFriendMenu.Visible = false end
 
-    -- Găsim butoanele de tab-uri (pot avea același nume ca meniurile sau nume specifice)
-    -- Pe baza imaginii, exista butoane TextButton la fel numite: ADDFRIEND, INVITEFRIEND, etc.
-    local addFriendBtn = friendTab:FindFirstChild("ADDFRIEND", true) -- Trecem prin toți copiii
-    -- Atenție: Dacă Frame-ul și Butonul au același nume, le diferențiem prin Clasă
-    for _, child in ipairs(friendTab:GetChildren()) do
-        if child.Name == "ADDFRIEND" and child:IsA("GuiButton") then
-            addFriendBtn = child
-        end
-    end
-
-    local inviteFriendBtn = nil
-    for _, child in ipairs(friendTab:GetChildren()) do
-        if child.Name == "INVITEFRIEND" and child:IsA("GuiButton") then
-            inviteFriendBtn = child
-        end
-    end
+    -- Butoanele tab-urilor principale
+    local addFriendBtn = friendTab:FindFirstChild("ADDFRIENDBUTTMAIN")
+    local inviteFriendBtn = friendTab:FindFirstChild("INVITEFRIENDBUTTMAIN")
 
     -- Buton de Close pentru Social (daca exista ExitButton)
-    local exitBtn = socialMainFrame:FindFirstChild("ExitButton") or socialMainFrame:FindFirstChild("CloseButton")
+    local exitBtn = socialMainFrame.Parent:FindFirstChild("EXITBUTTON") or socialMainFrame:FindFirstChild("EXITBUTTON")
     if exitBtn then
         bindHoverAnimation(exitBtn)
         table.insert(activeConnections, exitBtn.MouseButton1Click:Connect(function()
@@ -253,8 +240,8 @@ local function setupSocialUI()
                                     end)
                                 end
 
-                                local invPartyBtn = newFrame:FindFirstChild("INVITEPARTY")
-                                local invGameBtn = newFrame:FindFirstChild("INVITEGAME")
+                                local invPartyBtn = newFrame:FindFirstChild("INVITEPARTYBUTTFRIEND")
+                                local invGameBtn = newFrame:FindFirstChild("INVITEGAMEBUTTFRIEND")
 
                                 if invPartyBtn then
                                     -- Nu mai punem hover events in activeConnections aici pentru ca sunt distruse regulat
@@ -309,8 +296,8 @@ local function setupSocialUI()
             local currentSearchUsername = nil
 
             -- Bind static button events ONLY ONCE outside of the search loop
-            local addBtn = userFrame:FindFirstChild("ADDFRIEND")
-            local invitePartyBtn = userFrame:FindFirstChild("INVITEPARTY")
+            local addBtn = userFrame:FindFirstChild("ADDFRIENDBUTTUF")
+            local invitePartyBtn = userFrame:FindFirstChild("INVITEPARTYBUTTUF")
 
             if addBtn then
                 bindHoverAnimation(addBtn)
