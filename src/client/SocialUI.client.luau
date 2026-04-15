@@ -119,15 +119,15 @@ local function setupSocialUI()
 
     socialGui.Enabled = true
 
-    local socialsButton = mainUI:FindFirstChild("SocialsButton")
+    local socialsButton = mainUI:FindFirstChild("SocialButton")
     if not socialsButton then
         local cornerBtns = mainUI:FindFirstChild("CornerButtons")
-        if cornerBtns then socialsButton = cornerBtns:FindFirstChild("SocialsButton") end
+        if cornerBtns then socialsButton = cornerBtns:FindFirstChild("SocialButton") end
     end
 
     local socialMainFrame = socialGui:FindFirstChild("MainFrame")
     if not socialsButton or not socialMainFrame then
-        warn("SocialUI: Missing SocialsButton or MainFrame")
+        warn("SocialUI: Missing SocialButton or MainFrame")
         return
     end
 
