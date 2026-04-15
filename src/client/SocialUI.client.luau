@@ -120,8 +120,8 @@ local function setupPartyUI(socialMainFrame)
     memberInfo.Visible = false
     partyInfo.Visible = true
 
-    local topText = partyInfo:FindFirstChild("TextLabel")
-    local leaveBtn = partyInfo:FindFirstChild("LEAVE") or partyInfo:FindFirstChild("LEAVEBUTTON") or partyInfo:FindFirstChild("LeaveButton")
+    local topText = partyTab:FindFirstChild("PartyName") or partyInfo:FindFirstChild("TextLabel")
+    local leaveBtn = partyTab:FindFirstChild("LeaveButton") or partyInfo:FindFirstChild("LeaveButton")
 
     if leaveBtn then
         bindHoverAnimation(leaveBtn)
@@ -131,9 +131,9 @@ local function setupPartyUI(socialMainFrame)
         end))
     end
 
-    local kickBtn = memberInfo:FindFirstChild("KICKBUTTON")
-    local promoteBtn = memberInfo:FindFirstChild("PROMOTEBUTTON")
-    local backBtn = memberInfo:FindFirstChild("BACKBUTTON")
+    local kickBtn = memberInfo:FindFirstChild("KickButton") or memberInfo:FindFirstChild("KICKBUTTON")
+    local promoteBtn = memberInfo:FindFirstChild("PromoteButton") or memberInfo:FindFirstChild("PROMOTEBUTTON")
+    local backBtn = memberInfo:FindFirstChild("BackButton") or memberInfo:FindFirstChild("BACKBUTTON")
 
     local selectedUserId = nil
 
@@ -178,6 +178,10 @@ local function setupPartyUI(socialMainFrame)
 
         local isLocalOwner = (payload.owner == player.UserId)
 
+        -- Ascundem automat MemberInfo cand dam kick/promote daca targetul a iesit,
+        -- sau doar re-evaluam daca suntem inca Owner,
+        -- Dar update-ul in sine se intampla cand se schimba membrii.
+
         for i = 1, 4 do
             local slot = partyInfo:FindFirstChild("MEMBER" .. i)
             if not slot then continue end
@@ -185,7 +189,7 @@ local function setupPartyUI(socialMainFrame)
             local memberData = payload.members[i]
             if memberData then
                 slot.Visible = true
-                local nameLabel = slot:FindFirstChild("TextLabel")
+                local nameLabel = slot:FindFirstChild("Name") or slot:FindFirstChild("TextLabel")
                 if nameLabel then nameLabel.Text = memberData.name end
 
                 local imgLabel = slot:FindFirstChild("ImageLabel")
@@ -198,7 +202,7 @@ local function setupPartyUI(socialMainFrame)
                     end)
                 end
 
-                local infoBtn = slot:FindFirstChild("InfoButton") or slot:FindFirstChild("INFO")
+                local infoBtn = slot:FindFirstChild("InfoButton")
                 if infoBtn then
                     if isLocalOwner and memberData.userId ~= player.UserId then
                         infoBtn.Visible = true
@@ -210,12 +214,38 @@ local function setupPartyUI(socialMainFrame)
                 slot.Visible = false
             end
         end
+
+        -- Daca cineva se muta/pleaca, iar meniul MemberInfo e deschis cu un anumit ID, actualizam datele acolo automat, sau iesim daca a plecat.
+        if memberInfo.Visible and selectedUserId then
+            local stillInParty = false
+            local selectedMemberData = nil
+            for _, m in ipairs(payload.members) do
+                if m.userId == selectedUserId then
+                    stillInParty = true
+                    selectedMemberData = m
+                    break
+                end
+            end
+
+            if not stillInParty then
+                memberInfo.Visible = false
+                partyInfo.Visible = true
+            elseif selectedMemberData then
+                local nameLabel = memberInfo:FindFirstChild("Name") or memberInfo:FindFirstChild("TextLabel")
+                if nameLabel then nameLabel.Text = selectedMemberData.name end
+
+                local statusLabel = memberInfo:FindFirstChild("Status")
+                if statusLabel then
+                    statusLabel.Text = (payload.owner == selectedMemberData.userId) and "Owner" or "Member"
+                end
+            end
+        end
     end))
 
     for i = 1, 4 do
         local slot = partyInfo:FindFirstChild("MEMBER" .. i)
         if not slot then continue end
-        local infoBtn = slot:FindFirstChild("InfoButton") or slot:FindFirstChild("INFO")
+        local infoBtn = slot:FindFirstChild("InfoButton")
         if infoBtn then
             bindHoverAnimation(infoBtn)
             table.insert(activeConnections, infoBtn.MouseButton1Click:Connect(function()
@@ -225,7 +255,7 @@ local function setupPartyUI(socialMainFrame)
                 local memberData = currentPartyData.members[i]
                 selectedUserId = memberData.userId
 
-                local nameLabel = memberInfo:FindFirstChild("TextLabel")
+                local nameLabel = memberInfo:FindFirstChild("Name") or memberInfo:FindFirstChild("TextLabel")
                 if nameLabel then nameLabel.Text = memberData.name end
 
                 local imgLabel = memberInfo:FindFirstChild("ImageLabel")
@@ -238,7 +268,7 @@ local function setupPartyUI(socialMainFrame)
                     end)
                 end
 
-                local statusLabel = memberInfo:FindFirstChild("StatusLabel") or memberInfo:FindFirstChild("RoleLabel") or memberInfo:FindFirstChild("RoleText")
+                local statusLabel = memberInfo:FindFirstChild("Status")
                 if statusLabel then
                     statusLabel.Text = (currentPartyData.owner == memberData.userId) and "Owner" or "Member"
                 end
