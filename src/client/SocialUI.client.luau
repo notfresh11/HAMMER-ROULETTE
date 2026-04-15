@@ -3,6 +3,7 @@ local TweenService = game:GetService("TweenService")
 local StarterGui = game:GetService("StarterGui")
 
 local player = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- Constants
@@ -65,12 +66,19 @@ local function bindHoverAnimation(button)
         end))
     end
 
-    table.insert(activeConnections, button.MouseEnter:Connect(function()
+    local enterConn = button.MouseEnter:Connect(function()
         TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
-    end))
-    table.insert(activeConnections, button.MouseLeave:Connect(function()
+    end)
+    local leaveConn = button.MouseLeave:Connect(function()
         TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = originalSize}):Play()
-    end))
+    end)
+
+    -- Only insert into global activeConnections if the button is not a temporary clone
+    -- (We assume buttons with names starting with "INVITE" inside a clone are dynamic)
+    if not button.Name:match("^INVITE") then
+        table.insert(activeConnections, enterConn)
+        table.insert(activeConnections, leaveConn)
+    end
 end
 
 -- Funcție pentru animarea ferestrelor (deschidere)
@@ -123,7 +131,17 @@ local function setupSocialUI()
         return
     end
 
+    -- Store original size manually BEFORE hiding or zeroing it out to prevent openMenu from breaking
+    if not socialMainFrame:GetAttribute("OriginalSizeXScale") then
+        socialMainFrame:SetAttribute("OriginalSizeXScale", socialMainFrame.Size.X.Scale)
+        socialMainFrame:SetAttribute("OriginalSizeXOffset", socialMainFrame.Size.X.Offset)
+        socialMainFrame:SetAttribute("OriginalSizeYScale", socialMainFrame.Size.Y.Scale)
+        socialMainFrame:SetAttribute("OriginalSizeYOffset", socialMainFrame.Size.Y.Offset)
+    end
+
+    -- Fix initial visibility explicitly before any logic
     socialMainFrame.Visible = false
+    socialMainFrame.Size = UDim2.new(0, 0, 0, 0)
 
     local friendTab = socialMainFrame:FindFirstChild("Friend")
     if not friendTab then return end
@@ -159,6 +177,7 @@ local function setupSocialUI()
         bindHoverAnimation(exitBtn)
         table.insert(activeConnections, exitBtn.MouseButton1Click:Connect(function()
             playSoundIsolated(CLICK_SOUND_ID)
+            -- Instead of just Visible = false, we should tween it away or just close it consistently
             socialMainFrame.Visible = false
         end))
     end
@@ -177,6 +196,16 @@ local function setupSocialUI()
             socialMainFrame.Visible = false
         end
     end))
+
+    -- Ensure Social Menu hides when game starts/MAINUI is toggled off
+    local toggleMainUiEvent = ReplicatedStorage:FindFirstChild("ToggleMainUIEvent")
+    if toggleMainUiEvent then
+        table.insert(activeConnections, toggleMainUiEvent.OnClientEvent:Connect(function(isVisible)
+            if not isVisible and socialMainFrame then
+                socialMainFrame.Visible = false
+            end
+        end))
+    end
 
     -- TAB: INVITE FRIEND LOGIC
     if inviteFriendBtn and inviteFriendMenu then
@@ -228,6 +257,7 @@ local function setupSocialUI()
                                 local invGameBtn = newFrame:FindFirstChild("INVITEGAME")
 
                                 if invPartyBtn then
+                                    -- Nu mai punem hover events in activeConnections aici pentru ca sunt distruse regulat
                                     bindHoverAnimation(invPartyBtn)
                                     invPartyBtn.MouseButton1Click:Connect(function()
                                         playSoundIsolated(CLICK_SOUND_ID)
