@@ -6,6 +6,15 @@ local player = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local playerGui = player:WaitForChild("PlayerGui")
 
+local _socialGui = playerGui:FindFirstChild("Social")
+if _socialGui then
+    local _mainFrame = _socialGui:FindFirstChild("MainFrame")
+    if _mainFrame then
+        _mainFrame.Visible = false
+        _mainFrame.Size = UDim2.new(0, 0, 0, 0)
+    end
+end
+
 -- Constants
 local CLICK_SOUND_ID = "rbxassetid://124476359159008"
 
