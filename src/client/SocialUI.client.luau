@@ -447,9 +447,6 @@ local function setupSocialUI()
 
                                 newFrame.Parent = inviteFriendMenu
                             end
-
-                            if friendPages.IsFinished then break end
-                            friendPages:AdvanceToNextPageAsync()
                         end
                     else
                         warn("SocialUI: Failed to fetch friends")
