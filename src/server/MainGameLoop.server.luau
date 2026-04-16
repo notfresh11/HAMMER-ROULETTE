@@ -23,7 +23,7 @@ end
 
 -- UI Events
 -- UI Events and VFX
-local uiEvents = {"ShowCountdownEvent", "NotificationEvent", "NotificationResponseEvent", "SendNotificationEvent", "ShowTextEvent", "HideTextEvent", "VfxEvent", "ToggleAFKEvent", "ToggleMainUIEvent", "UpdateMatchmakingUIEvent", "PartyUpdateEvent", "PartyActionEvent"}
+local uiEvents = {"ShowCountdownEvent", "NotificationEvent", "NotificationResponseEvent", "SendNotificationEvent", "ShowTextEvent", "HideTextEvent", "VfxEvent", "ToggleAFKEvent", "ToggleMainUIEvent", "UpdateMatchmakingUIEvent", "PartyUpdateEvent", "PartyActionEvent", "AbilityRequestEvent", "AbilityUseEvent", "AbilityStateEvent", "DashVelocityEvent"}
 for _, evName in ipairs(uiEvents) do
     if not ReplicatedStorage:FindFirstChild(evName) then
         local ev = Instance.new("RemoteEvent")
