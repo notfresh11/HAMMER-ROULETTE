@@ -216,6 +216,40 @@ local function onPlayerRemoving(player)
     end
 end
 
+function PartyManager.HandleAction(player, action, payload)
+    if not player or not action then return end
+    if action == "join" then
+        local targetUsername = payload.targetUsername
+        if targetUsername then
+            local targetPlayer = Players:FindFirstChild(targetUsername)
+            if targetPlayer then
+                local targetPartyId = playerPartyMap[targetPlayer.UserId]
+                if targetPartyId then
+                    -- Fortam jucatorul sa iasa din party-ul actual
+                    PartyManager.leaveParty(player.UserId)
+
+                    -- Curatam party-ul creat de leaveParty
+                    local oldNewPId = playerPartyMap[player.UserId]
+                    if oldNewPId then
+                        local oldNewParty = parties[oldNewPId]
+                        if oldNewParty and oldNewParty.owner == player.UserId and #oldNewParty.members == 1 then
+                            parties[oldNewPId] = nil
+                            playerPartyMap[player.UserId] = nil
+                        end
+                    end
+
+                    local targetParty = parties[targetPartyId]
+                    if targetParty and #targetParty.members < 4 then
+                        table.insert(targetParty.members, player.UserId)
+                        playerPartyMap[player.UserId] = targetPartyId
+                        sendUpdateToParty(targetPartyId)
+                    end
+                end
+            end
+        end
+    end
+end
+
 function PartyManager.Init()
     partyUpdateEvent = ReplicatedStorage:FindFirstChild("PartyUpdateEvent")
     partyActionEvent = ReplicatedStorage:FindFirstChild("PartyActionEvent")
@@ -236,6 +270,35 @@ function PartyManager.Init()
             local targetUsername = payload.targetUsername
             if targetUsername then
                 PartyManager.invitePlayer(player, targetUsername)
+            end
+        elseif action == "join" then
+            local targetUsername = payload.targetUsername
+            if targetUsername then
+                local targetPlayer = Players:FindFirstChild(targetUsername)
+                if targetPlayer then
+                    local targetPartyId = playerPartyMap[targetPlayer.UserId]
+                    if targetPartyId then
+                        -- Fortam jucatorul sa iasa din party-ul actual si sa intre in cel nou
+                        PartyManager.leaveParty(player.UserId)
+
+                        -- Anulam crearea de party 1/4 din leaveParty stergandu-l din vechiul party (LeaveParty creeaza unul automat, deci il scoatem iar)
+                        local oldNewPId = playerPartyMap[player.UserId]
+                        if oldNewPId then
+                            local oldNewParty = parties[oldNewPId]
+                            if oldNewParty and oldNewParty.owner == player.UserId and #oldNewParty.members == 1 then
+                                parties[oldNewPId] = nil
+                                playerPartyMap[player.UserId] = nil
+                            end
+                        end
+
+                        local targetParty = parties[targetPartyId]
+                        if #targetParty.members < 4 then
+                            table.insert(targetParty.members, player.UserId)
+                            playerPartyMap[player.UserId] = targetPartyId
+                            sendUpdateToParty(targetPartyId)
+                        end
+                    end
+                end
             end
         elseif action == "kick" then
             local targetUserId = payload.targetUserId

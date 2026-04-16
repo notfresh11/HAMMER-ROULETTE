@@ -17,7 +17,8 @@ local INITIAL_DATA = {
     WinStreak = 0,
     SurviveStreak = 0,
     OwnedAbilities = { ["Dash"] = true },
-    EquippedAbility = "Dash"
+    EquippedAbility = "Dash",
+    Friends = {}
 }
 
 -- Deep copy function to avoid modifying the template
@@ -140,6 +141,70 @@ function DataManager.IncrementValue(player, key, amount)
     local data = playerData[player.UserId]
     if data and type(data[key]) == "number" and type(amount) == "number" then
         data[key] = data[key] + amount
+    end
+end
+
+-- Friend System Additions
+
+-- Gets the list of friend user IDs for a player
+function DataManager.GetFriends(player)
+    local data = playerData[player.UserId]
+    if data and data.Friends then
+        return data.Friends
+    end
+    return {}
+end
+
+-- Directly add a friend to the active session data (used when both are online)
+local function addFriendToSession(userId, friendId)
+    if playerData[userId] then
+        if not playerData[userId].Friends then
+            playerData[userId].Friends = {}
+        end
+        if not table.find(playerData[userId].Friends, friendId) then
+            table.insert(playerData[userId].Friends, friendId)
+        end
+    end
+end
+
+-- Global function to add a friendship bilaterally
+function DataManager.AddFriend(player1Id, player2Id)
+    -- Add for player 1 (if online, direct, otherwise async datastore update)
+    if playerData[player1Id] then
+        addFriendToSession(player1Id, player2Id)
+    else
+        task.spawn(function()
+            pcall(function()
+                PlayerDataStore:UpdateAsync("Player_" .. player1Id, function(oldData)
+                    if oldData then
+                        if not oldData.Friends then oldData.Friends = {} end
+                        if not table.find(oldData.Friends, player2Id) then
+                            table.insert(oldData.Friends, player2Id)
+                        end
+                    end
+                    return oldData
+                end)
+            end)
+        end)
+    end
+
+    -- Add for player 2
+    if playerData[player2Id] then
+        addFriendToSession(player2Id, player1Id)
+    else
+        task.spawn(function()
+            pcall(function()
+                PlayerDataStore:UpdateAsync("Player_" .. player2Id, function(oldData)
+                    if oldData then
+                        if not oldData.Friends then oldData.Friends = {} end
+                        if not table.find(oldData.Friends, player1Id) then
+                            table.insert(oldData.Friends, player1Id)
+                        end
+                    end
+                    return oldData
+                end)
+            end)
+        end)
     end
 end
 

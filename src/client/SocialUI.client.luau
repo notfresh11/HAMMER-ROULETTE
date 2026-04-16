@@ -108,6 +108,8 @@ end
 
 local partyUpdateEvent = ReplicatedStorage:WaitForChild("PartyUpdateEvent")
 local partyActionEvent = ReplicatedStorage:WaitForChild("PartyActionEvent")
+local sendNotificationEvent = ReplicatedStorage:WaitForChild("SendNotificationEvent")
+local fetchFriendsFunction = ReplicatedStorage:WaitForChild("FetchFriendsFunction")
 
 local currentPartyData = nil
 
@@ -395,59 +397,55 @@ local function setupSocialUI()
 
                 -- Aducem prietenii async
                 task.spawn(function()
-                    local success, friendPages = pcall(function()
-                        return Players:GetFriendsAsync(player.UserId)
+                    local success, friends = pcall(function()
+                        return fetchFriendsFunction:InvokeServer()
                     end)
 
-                    if success and friendPages then
-                        while true do
-                            for _, friend in ipairs(friendPages:GetCurrentPage()) do
-                                local newFrame = template:Clone()
-                                newFrame.Name = "Friend_" .. friend.Username
-                                newFrame.Visible = true
+                    if success and friends then
+                        for _, friend in ipairs(friends) do
+                            local newFrame = template:Clone()
+                            newFrame.Name = "Friend_" .. friend.Username
+                            newFrame.Visible = true
 
-                                local textLabel = newFrame:FindFirstChild("TextLabel")
-                                if textLabel then textLabel.Text = friend.Username end
+                            local textLabel = newFrame:FindFirstChild("TextLabel")
+                            if textLabel then textLabel.Text = friend.Username end
 
-                                local imgLabel = newFrame:FindFirstChild("ImageLabel")
-                                if imgLabel then
-                                    task.spawn(function()
-                                        local succ, thumb = pcall(function()
-                                            return Players:GetUserThumbnailAsync(friend.Id, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
-                                        end)
-                                        if succ then imgLabel.Image = thumb end
+                            local imgLabel = newFrame:FindFirstChild("ImageLabel")
+                            if imgLabel then
+                                task.spawn(function()
+                                    local succ, thumb = pcall(function()
+                                        return Players:GetUserThumbnailAsync(friend.Id, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
                                     end)
-                                end
-
-                                local invPartyBtn = newFrame:FindFirstChild("INVITEPARTYBUTTFRIEND")
-                                local invGameBtn = newFrame:FindFirstChild("INVITEGAMEBUTTFRIEND")
-
-                                if invPartyBtn then
-                                    -- Nu mai punem hover events in activeConnections aici pentru ca sunt distruse regulat
-                                    bindHoverAnimation(invPartyBtn)
-                                    invPartyBtn.MouseButton1Click:Connect(function()
-                                        playSoundIsolated(CLICK_SOUND_ID)
-                                        partyActionEvent:FireServer("invite", {targetUsername = friend.Username})
-                                        print("[Socials] Invited " .. friend.Username .. " to Party!")
-                                    end)
-                                end
-
-                                if invGameBtn then
-                                    bindHoverAnimation(invGameBtn)
-                                    invGameBtn.MouseButton1Click:Connect(function()
-                                        playSoundIsolated(CLICK_SOUND_ID)
-                                        print("[Socials] Invited " .. friend.Username .. " to Game! (Placeholder)")
-                                    end)
-                                end
-
-                                newFrame.Parent = inviteFriendMenu
+                                    if succ then imgLabel.Image = thumb end
+                                end)
                             end
 
-                            if friendPages.IsFinished then break end
-                            friendPages:AdvanceToNextPageAsync()
+                            local invPartyBtn = newFrame:FindFirstChild("INVITEPARTYBUTTFRIEND")
+                            local invGameBtn = newFrame:FindFirstChild("INVITEGAMEBUTTFRIEND")
+
+                            if invPartyBtn then
+                                -- Nu mai punem hover events in activeConnections aici pentru ca sunt distruse regulat
+                                bindHoverAnimation(invPartyBtn)
+                                invPartyBtn.MouseButton1Click:Connect(function()
+                                    playSoundIsolated(CLICK_SOUND_ID)
+                                    sendNotificationEvent:FireServer(friend.Id, "PartyInvite")
+                                    print("[Socials] Sent Party Invite to " .. friend.Username .. "!")
+                                end)
+                            end
+
+                            if invGameBtn then
+                                bindHoverAnimation(invGameBtn)
+                                invGameBtn.MouseButton1Click:Connect(function()
+                                    playSoundIsolated(CLICK_SOUND_ID)
+                                    sendNotificationEvent:FireServer(friend.Id, "GameInvite")
+                                    print("[Socials] Sent Game Invite to " .. friend.Username .. "!")
+                                end)
+                            end
+
+                            newFrame.Parent = inviteFriendMenu
                         end
                     else
-                        warn("SocialUI: Failed to fetch friends")
+                        warn("SocialUI: Failed to fetch custom friends")
                     end
                 end)
             end
@@ -485,14 +483,8 @@ local function setupSocialUI()
                     playSoundIsolated(CLICK_SOUND_ID)
                     if not currentSearchUserId then return end
 
-                    pcall(function()
-                        local targetPlayer = Players:GetPlayerByUserId(currentSearchUserId)
-                        if targetPlayer then
-                            StarterGui:SetCore("PromptSendFriendRequest", targetPlayer)
-                        else
-                            print("[Socials] Poti da add doar jucatorilor din server (via SetCore). Pentru viitor, vom adauga un API custom. (Placeholder)")
-                        end
-                    end)
+                    sendNotificationEvent:FireServer(currentSearchUserId, "FriendRequest")
+                    print("[Socials] Sent Custom Friend Request to " .. tostring(currentSearchUserId) .. "!")
                 end))
             end
 
@@ -500,9 +492,9 @@ local function setupSocialUI()
                 bindHoverAnimation(invitePartyBtn)
                 table.insert(activeConnections, invitePartyBtn.MouseButton1Click:Connect(function()
                     playSoundIsolated(CLICK_SOUND_ID)
-                    if currentSearchUsername then
-                        partyActionEvent:FireServer("invite", {targetUsername = currentSearchUsername})
-                        print("[Socials] Invited " .. currentSearchUsername .. " to Party!")
+                    if currentSearchUserId then
+                        sendNotificationEvent:FireServer(currentSearchUserId, "PartyInvite")
+                        print("[Socials] Sent Party Invite to " .. tostring(currentSearchUsername) .. "!")
                     end
                 end))
             end
