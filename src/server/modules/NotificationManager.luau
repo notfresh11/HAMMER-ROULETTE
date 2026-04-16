@@ -10,15 +10,20 @@ local NotificationManager = {}
 
 local TOPIC = "GlobalNotifications"
 
-local notificationEvent = ReplicatedStorage:WaitForChild("NotificationEvent")
-local notificationResponseEvent = ReplicatedStorage:WaitForChild("NotificationResponseEvent")
-local sendNotificationEvent = ReplicatedStorage:WaitForChild("SendNotificationEvent")
+local notificationEvent
+local notificationResponseEvent
+local sendNotificationEvent
 
 -- Cooldowns to prevent spam [senderId_targetId_type] = tick()
 local cooldowns = {}
 local COOLDOWN_TIME = 10 -- seconds
 
 function NotificationManager.Start()
+    print("[DEBUG] NotificationManager.Start() apelat.")
+    notificationEvent = ReplicatedStorage:WaitForChild("NotificationEvent")
+    notificationResponseEvent = ReplicatedStorage:WaitForChild("NotificationResponseEvent")
+    sendNotificationEvent = ReplicatedStorage:WaitForChild("SendNotificationEvent")
+
     local fetchFriendsFunction = ReplicatedStorage:WaitForChild("FetchFriendsFunction")
     fetchFriendsFunction.OnServerInvoke = function(player)
         local friendsData = DataManager.GetFriends(player)

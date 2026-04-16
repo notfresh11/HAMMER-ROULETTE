@@ -72,23 +72,26 @@ function MapManager.hideAllMaps()
     -- Găsim hărțile din ServerStorage și le convertim în Modele (pentru PivotTo)
     for _, child in ipairs(ServerStorage:GetChildren()) do
         if child.Name:match("^Map") and child.Name ~= "MapStorage" then
+            print("[DEBUG] MapManager processing map:", child.Name)
             -- Avem nevoie ca ele sa fie Model pentru a folosi PivotTo() mai târziu
             local mapModel
             if child:IsA("Folder") then
                 mapModel = Instance.new("Model")
                 mapModel.Name = child.Name
-                -- Trebuie să folosim un while pt că GetChildren() dintr-un array se scurtează la reparentare
-                while #child:GetChildren() > 0 do
-                    local elem = child:GetChildren()[1]
+                -- Folosim GetChildren in loc de while pentru a evita infinite loops daca un element nu se muta
+                local childrenToMoveMap = child:GetChildren()
+                for _, elem in ipairs(childrenToMoveMap) do
                     elem.Parent = mapModel
                 end
                 child:Destroy()
+                print("[DEBUG] MapManager converted Folder to Model for:", mapModel.Name)
             else
                 mapModel = child
             end
             mapModel.Parent = mapStorage
         end
     end
+    print("[DEBUG] MapManager.hideAllMaps() completat cu succes.")
 end
 
 function MapManager.cleanupCurrentMap()
