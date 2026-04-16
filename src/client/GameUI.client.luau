@@ -4,6 +4,23 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
+-- Instantly hide frames that pop up due to Studio defaults before scripts load
+local function instantHide(guiName)
+    local gui = playerGui:FindFirstChild(guiName)
+    if gui then
+        local mf = gui:FindFirstChild("MainFrame")
+        if mf then
+            mf.Visible = false
+            mf.Size = UDim2.new(0, 0, 0, 0)
+        end
+    end
+end
+instantHide("Shop")
+instantHide("Quests")
+instantHide("Stats")
+instantHide("Settings")
+instantHide("Discord")
+
 -- Creează UI-ul
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "GameUIScreen"

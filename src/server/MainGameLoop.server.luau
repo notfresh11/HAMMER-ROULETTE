@@ -28,7 +28,7 @@ local uiEvents = {
     "ShowTextEvent", "HideTextEvent", "VfxEvent", "ToggleAFKEvent", "ToggleMainUIEvent",
     "UpdateMatchmakingUIEvent", "PartyUpdateEvent", "PartyActionEvent", "AbilityRequestEvent",
     "AbilityUseEvent", "AbilityStateEvent", "DashVelocityEvent", "UpdateStatsEvent",
-    "UpdateModifiersUIEvent", "ClientModifierEvent", "KnockbackEvent", "BeachBallThrowEvent",
+    "UpdateModifiersUIEvent", "ClientModifierEvent", "KnockbackClickEvent", "BeachBallThrowEvent",
     "HotPotatoTimerEvent", "PassEvent", "ShockwaveVfxEvent"
 }
 for _, evName in ipairs(uiEvents) do
