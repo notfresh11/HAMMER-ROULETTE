@@ -455,7 +455,6 @@ local function setupSocialUI()
                                 end
 
                                 newFrame.Parent = inviteFriendMenu
-                            end
                         end
                     else
                         warn("SocialUI: Failed to fetch friends")
