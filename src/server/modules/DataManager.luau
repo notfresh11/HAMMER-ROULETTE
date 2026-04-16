@@ -17,7 +17,8 @@ local INITIAL_DATA = {
     WinStreak = 0,
     SurviveStreak = 0,
     OwnedAbilities = { ["Dash"] = true },
-    EquippedAbility = "Dash"
+    EquippedAbility = "Dash",
+    Friends = {} -- List of UserIds: { [userId] = true }
 }
 
 -- Deep copy function to avoid modifying the template
@@ -144,3 +145,51 @@ function DataManager.IncrementValue(player, key, amount)
 end
 
 return DataManager
+
+-- Friends System Functions
+function DataManager.AddFriend(player, friendUserId)
+    local data = playerData[player.UserId]
+    if data then
+        if not data.Friends then
+            data.Friends = {}
+        end
+        data.Friends[tostring(friendUserId)] = true
+    end
+end
+
+function DataManager.RemoveFriend(player, friendUserId)
+    local data = playerData[player.UserId]
+    if data and data.Friends then
+        data.Friends[tostring(friendUserId)] = nil
+    end
+end
+
+function DataManager.GetFriends(player)
+    local data = playerData[player.UserId]
+    if data and data.Friends then
+        return data.Friends
+    end
+    return {}
+end
+
+-- Function to handle offline friend addition/removal using UpdateAsync
+function DataManager.ModifyOfflineFriend(userId, friendUserId, isAdding)
+    local playerUserIdKey = "Player_" .. userId
+    local success, errorMessage = pcall(function()
+        PlayerDataStore:UpdateAsync(playerUserIdKey, function(oldData)
+            local data = oldData or deepCopy(INITIAL_DATA)
+            if not data.Friends then
+                data.Friends = {}
+            end
+            if isAdding then
+                data.Friends[tostring(friendUserId)] = true
+            else
+                data.Friends[tostring(friendUserId)] = nil
+            end
+            return data
+        end)
+    end)
+    if not success then
+        warn("DataManager: Failed to update offline friend for " .. userId .. " Error: " .. tostring(errorMessage))
+    end
+end
